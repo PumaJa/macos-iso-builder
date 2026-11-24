@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- STM32 Virtual COM Port used by VESC hardware (VID 0x0483 / PID 0x5740) -->
+    <usb-device vendor-id="1155" product-id="22336" />
+    <!-- Generic CDC-ACM devices -->
+    <usb-device class="2" />
+</resources>

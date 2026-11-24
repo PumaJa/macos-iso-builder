@@ -3,6 +3,7 @@ package org.kineticos.export
 import org.kineticos.telemetry.TelemetrySample
 import kotlin.math.*
 
+@kotlinx.serialization.Serializable
 data class RideSummary(
     val distanceM: Double,
     val distanceSource: String,       // "gps", "vesc-speed", "speed", "none"
