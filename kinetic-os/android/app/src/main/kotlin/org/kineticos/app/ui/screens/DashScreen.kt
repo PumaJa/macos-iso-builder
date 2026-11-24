@@ -127,12 +127,12 @@ fun DashScreen(go: (Screen) -> Unit) {
         // vehicle + quick modes
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (vehicle?.photoUri != null) AsyncImage(vehicle!!.photoUri, vehicle!!.name, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
-            Column(Modifier.padding(horizontal = 8.dp).widthIn(max = 140.dp)) {
+            Column(Modifier.padding(horizontal = 6.dp).widthIn(max = 96.dp)) {
                 Text(vehicle?.name ?: "No vehicle", style = labelStyle(12), color = p.text, maxLines = 1)
                 Text(applied?.name ?: "STOCK", style = labelStyle(10), color = K.Accent)
             }
             profiles.take(4).forEach { pr ->
-                BigButton(pr.name, Modifier.weight(1f).padding(horizontal = 3.dp), selected = applied?.id == pr.id) { scope.launch { g.toast(g.applyProfile(pr)) } }
+                BigButton(pr.name, Modifier.weight(1f).padding(horizontal = 2.dp), selected = applied?.id == pr.id, compact = true) { scope.launch { g.toast(g.applyProfile(pr)) } }
             }
         }
     }

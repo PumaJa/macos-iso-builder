@@ -86,7 +86,7 @@ fun MapScreen() {
     }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember { MapView(ctx).apply { onCreate(null) } }
+    val mapView = remember { (ctx.applicationContext as org.kineticos.app.KineticApp).ensureMap(); MapView(ctx).apply { onCreate(null) } }
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e ->
             when (e) { Lifecycle.Event.ON_START -> mapView.onStart(); Lifecycle.Event.ON_RESUME -> mapView.onResume()
@@ -98,6 +98,7 @@ fun MapScreen() {
     LaunchedEffect(mapView, night) {
         mapView.getMapAsync { m ->
             map = m
+            mapView.addOnDidFailLoadingMapListener { err -> info = "Map unavailable: $err (offline areas still work)" }
             m.uiSettings.isCompassEnabled = true; m.uiSettings.isAttributionEnabled = true; m.uiSettings.isLogoEnabled = false
             m.setStyle(Style.Builder().fromUri(if (night) settings.mapStyleNight else settings.mapStyleDay)) { st ->
                 fun src(id: String) = st.addSource(GeoJsonSource(id))

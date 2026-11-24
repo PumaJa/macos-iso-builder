@@ -30,8 +30,12 @@ class CockpitService : Service() {
         super.onCreate()
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, "Cockpit", NotificationManager.IMPORTANCE_LOW))
-        val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-        ServiceCompat.startForeground(this, 1, build("Starting…"), type)
+        // Android 14 rejects a foreground-service type whose permission is missing → degrade instead of crashing.
+        val types = if (Build.VERSION.SDK_INT >= 29) listOf(
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION) else listOf(0)
+        val ok = types.any { t -> runCatching { ServiceCompat.startForeground(this, 1, build("Starting…"), t) }.isSuccess }
+        if (!ok) { graph.startRuntime(); stopSelf(); return }
         wake = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kinetic:cockpit").apply { setReferenceCounted(false); acquire(12 * 60 * 60 * 1000L) }
         graph.startRuntime()
         scope.launch {
@@ -63,9 +67,14 @@ class CockpitService : Service() {
 
     companion object {
         const val CHANNEL = "cockpit"; const val ACTION_STOP = "stop"
-        fun start(ctx: Context) {
+        /**
+         * From the visible activity a plain startService is allowed and avoids the 5–10 s startForeground() deadline
+         * (which slow/old devices can miss while the UI is still inflating). The service promotes itself in onCreate.
+         * Only the boot receiver (background start) must use startForegroundService.
+         */
+        fun start(ctx: Context, fromBackground: Boolean = false) {
             val i = Intent(ctx, CockpitService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
+            if (fromBackground && Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
         }
     }
 }

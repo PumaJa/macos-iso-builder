@@ -4,12 +4,11 @@ import android.app.Application
 import org.maplibre.android.MapLibre
 
 class KineticApp : Application() {
-    lateinit var graph: AppGraph; private set
-    override fun onCreate() {
-        super.onCreate()
-        runCatching { MapLibre.getInstance(this) } // native map engine; absent in JVM unit tests
-        graph = AppGraph(this)
-    }
+    /** Created on first use (keeps Application.onCreate cheap → faster cold start on old devices). */
+    val graph: AppGraph by lazy { AppGraph(this) }
+    private var mapInit = false
+    /** MapLibre native engine is initialised lazily by the map screens. */
+    fun ensureMap() { if (!mapInit) { runCatching { MapLibre.getInstance(this) }; mapInit = true } }
 }
 
 val android.content.Context.graph: AppGraph get() = (applicationContext as KineticApp).graph

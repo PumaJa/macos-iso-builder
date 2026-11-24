@@ -90,16 +90,16 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
 
 /** Large, glove-friendly button. */
 @Composable
-fun BigButton(text: String, modifier: Modifier = Modifier, selected: Boolean = false, color: Color = K.Accent, enabled: Boolean = true, onClick: () -> Unit) {
+fun BigButton(text: String, modifier: Modifier = Modifier, selected: Boolean = false, color: Color = K.Accent, enabled: Boolean = true, compact: Boolean = false, onClick: () -> Unit) {
     val p = LocalPalette.current
     val h = if (LocalGlove.current) 64.dp else 48.dp
     Box(
         modifier.heightIn(min = h).clip(RoundedCornerShape(14.dp))
             .background(if (selected) color.copy(alpha = 0.18f) else p.surface2)
             .border(if (selected) 2.dp else 1.dp, if (selected) color else p.grid, RoundedCornerShape(14.dp))
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 10.dp),
+            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = if (compact) 2.dp else 10.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = labelStyle(14).copy(letterSpacing = 1.sp), color = if (!enabled) p.textDim else if (selected) color else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+    ) { Text(text, style = labelStyle(if (compact) 12 else 14).copy(letterSpacing = if (compact) 0.sp else 1.sp), color = if (!enabled) p.textDim else if (selected) color else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
 
 @Composable

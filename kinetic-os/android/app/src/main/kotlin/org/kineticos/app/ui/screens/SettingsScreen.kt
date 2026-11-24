@@ -43,7 +43,7 @@ fun SettingsScreen() {
         LabeledSlider("Dim when idle & stationary", s.dimAfterIdleS.toFloat(), { v -> upd { it.copy(dimAfterIdleS = v.toInt()) } }, 0f..600f, { if (it < 1) "off" else "%.0f s".format(it) })
         SectionTitle("Cockpit")
         Toggle("Start on boot", s.autoStartOnBoot, { v -> upd { it.copy(autoStartOnBoot = v) } }, "Starts the background service and auto-connects. Android may require the app to be the HOME app to show the UI automatically.")
-        Toggle("Kiosk mode (screen pinning / lock task)", s.kiosk, { v -> upd { it.copy(kiosk = v) } }, "Full kiosk requires: adb shell dpm set-device-owner org.kineticos.app/.… (see INSTALL.md). Otherwise Android's screen pinning is used.")
+        Toggle("Kiosk mode (screen pinning / lock task)", s.kiosk, { v -> upd { it.copy(kiosk = v) } }, "Full kiosk: adb shell dpm set-device-owner org.kineticos.app/.service.KioskAdminReceiver on a reset phone (INSTALL.md). Otherwise Android screen pinning is used.")
         Toggle("Auto-record rides", s.autoRecord, { v -> upd { it.copy(autoRecord = v) } })
         Toggle("Power saver", s.powerSaver, { v -> upd { it.copy(powerSaver = v) } }, "Telemetry ≤ 4 Hz, telematics every 30 s")
         LabeledSlider("Telemetry poll rate", s.pollHz.toFloat(), { v -> upd { it.copy(pollHz = v.toInt()) } }, 1f..50f, { "%.0f Hz".format(it) })

@@ -16,7 +16,7 @@
 10. **Kiosk mode:** full lock-task requires provisioning the app as device owner; otherwise Android screen pinning applies.
     Android 10+ does not allow auto-opening the UI after boot unless Kinetic is the HOME app.
 11. **Odometer** is the sum of recorded real rides (VESC `odometer` from GET_VALUES_SETUP not yet used).
-12. **Emulator:** this build machine has no KVM; UI was verified with Robolectric (JVM) rendering instead of an emulator.
+12. **Emulator:** this build machine has no KVM; the emulator ran with software CPU emulation (very slow, SystemUI ANRs). Map tiles could not be loaded there because of the sandbox's TLS proxy – map rendering is unverified until tested on a device.
 13. **Auth token** stored in app-private DataStore (not Keystore-encrypted).
 14. The APK is large (~63 MB debug) because MapLibre ships native libraries for 4 ABIs; use ABI splits for distribution.
 15. LispBM: re-uploading the script without a VESC power cycle makes already-reduced limits the new ceiling (documented).

@@ -27,7 +27,7 @@ fun RideMap(samples: List<TelemetrySample>, cursor: Float, modifier: Modifier) {
     val pts = remember(samples) { samples.mapNotNull { it.gps } }
     if (pts.size < 2) return
     var style by remember { mutableStateOf<Style?>(null) }
-    val mv = remember { MapView(ctx).apply { onCreate(null); onStart(); onResume() } }
+    val mv = remember { (ctx.applicationContext as org.kineticos.app.KineticApp).ensureMap(); MapView(ctx).apply { onCreate(null); onStart(); onResume() } }
     DisposableEffect(Unit) { onDispose { mv.onPause(); mv.onStop(); mv.onDestroy() } }
     LaunchedEffect(Unit) {
         mv.getMapAsync { m ->

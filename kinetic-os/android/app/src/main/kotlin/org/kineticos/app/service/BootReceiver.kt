@@ -20,7 +20,7 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 if (context.graph.settingsRepo.current().autoStartOnBoot) {
-                    runCatching { CockpitService.start(context) }
+                    runCatching { CockpitService.start(context, fromBackground = true) }
                     runCatching { context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 }
             } finally { pending.finish() }

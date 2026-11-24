@@ -47,7 +47,13 @@ class MainActivity : ComponentActivity() {
 
     private fun isInLockTask() = getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
     /** Full kiosk needs the app to be device owner / allow-listed (adb dpm set-device-owner); otherwise Android shows screen pinning. */
-    private fun tryLockTask() { runCatching { if (!isInLockTask()) startLockTask() } }
+    private fun tryLockTask() {
+        runCatching {
+            val dpm = getSystemService(android.app.admin.DevicePolicyManager::class.java)
+            if (dpm.isDeviceOwnerApp(packageName)) dpm.setLockTaskPackages(android.content.ComponentName(this, org.kineticos.app.service.KioskAdminReceiver::class.java), arrayOf(packageName))
+            if (!isInLockTask()) startLockTask()
+        }
+    }
 
     fun applyImmersive(on: Boolean) {
         val c = WindowInsetsControllerCompat(window, window.decorView)
