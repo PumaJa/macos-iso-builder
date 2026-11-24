@@ -1,0 +1,10 @@
+{
+	# Let's Encrypt registration email (optional)
+	email {$ACME_EMAIL}
+}
+
+# Automatic HTTPS for your domain; WebSocket (/ws) is proxied transparently.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

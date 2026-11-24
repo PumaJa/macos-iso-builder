@@ -1,0 +1,79 @@
+# Kinetic OS server. Quick start:  cp .env.example .env  (set JWT_SECRET)  &&  docker compose up -d
+# HTTPS with automatic certificates:  docker compose --profile https up -d
+name: kinetic-os
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kinetic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-too}
+      POSTGRES_DB: kinetic
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kinetic -d kinetic"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    image: kinetic-os-server:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required (generate with openssl rand -hex 32)}"
+      DATABASE_URL: postgres://kinetic:${POSTGRES_PASSWORD:-change-me-too}@db:5432/kinetic
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      DATA_DIR: /data
+    volumes:
+      - api_data:/data
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: kinetic
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me-too}
+      PGDATABASE: kinetic
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+    volumes:
+      - ./backups:/backups
+      - ./backup/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "/backup.sh"]
+
+  # Optional HTTPS reverse proxy (automatic Let's Encrypt). Enable with: --profile https
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  api_data:
+  caddy_data:
+  caddy_config:
