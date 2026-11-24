@@ -179,7 +179,8 @@ class AppGraph(val ctx: Context) {
             val p = appliedProfile.value ?: continue
             val s = connection.sample.value ?: continue
             val (f, why) = Derating.factor(if (p.tempDerate) s.tempMosC.value else null, if (p.tempDerate) s.tempMotorC.value else null, if (p.socDerate) s.socPct.value else null)
-            if (f < lastFactor - 0.05 || f > lastFactor + 0.1) {
+            val stationary = (s.speedMps.value ?: 0.0) * 3.6 < 2.0
+            if (f < lastFactor - 0.05 || (f > lastFactor + 0.1 && stationary)) {
                 // Reductions are always allowed; recovery only at standstill (gate enforces).
                 val r = applyProfile(p)
                 if (!r.startsWith("Not applied")) { lastFactor = f; if (why.isNotEmpty()) toast("Power reduced: ${why.joinToString()}") }

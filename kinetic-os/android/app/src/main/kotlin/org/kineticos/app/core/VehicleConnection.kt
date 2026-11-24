@@ -53,7 +53,7 @@ class VehicleConnection(
     var transport: VescTransport? = null; private set
     private var job: Job? = null
     var engine: TelemetryEngine? = null; private set
-    var drivetrain = Drivetrain(7, 1.0, 0.5)
+    var drivetrain = Drivetrain(7, 1.0, 0.5, configured = false)
         set(value) { field = value; engine?.drivetrain = value }
     var pollHz = 10
     val isSimulated get() = transport?.kind == TransportKind.SIMULATION

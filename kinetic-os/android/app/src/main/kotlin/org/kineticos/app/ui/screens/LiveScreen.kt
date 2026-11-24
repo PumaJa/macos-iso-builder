@@ -39,7 +39,7 @@ fun LiveScreen() {
             Metric("Max speed", Q.of(e?.maxSpeedMps, cq), "km/h", 1, 3.6); Metric("Motor RPM", s?.motorRpm ?: Q.NA, "rpm"); Metric("ERPM", s?.erpm ?: Q.NA, "")
             Metric("Duty", s?.duty ?: Q.NA, "%", 0, 100.0); Metric("Throttle", s?.throttle ?: Q.NA, "%", 0, 100.0)
             Metric("Accel", s?.accelG ?: Q.NA, "g", 2); Metric("Lateral", s?.lateralG ?: Q.NA, "g", 2); Metric("Lean", s?.leanDeg ?: Q.NA, "°", 0); Metric("Pitch", s?.pitchDeg ?: Q.NA, "°", 0)
-            Metric("Altitude", Q.of(s?.gps?.altM, if (sim) Quality.SIMULATED else Quality.MEASURED), "m"); Metric("GPS speed", Q.of(s?.gps?.speedMps, Quality.MEASURED), "km/h", 1, 3.6)
+            Metric("Altitude", Q.of(s?.gps?.altM, Quality.MEASURED), "m"); Metric("GPS speed", Q.of(s?.gps?.speedMps, Quality.MEASURED), "km/h", 1, 3.6)
             Metric("Trip", Q.of(e?.distanceM, cq), "km", 2, 0.001); Metric("Ride time", Q.of(e?.movingTimeMs?.div(60000.0), cq), "min", 1)
         }
         SectionTitle("Power & energy")
@@ -61,15 +61,16 @@ fun LiveScreen() {
         s?.bms?.let { b ->
             SectionTitle("BMS (${b.cells.size} cells)")
             FlowRow3 {
-                Metric("SoC", Q.of(b.socPct, if (sim) Quality.SIMULATED else Quality.MEASURED), "%"); Metric("SoH", Q.of(b.sohPct, if (sim) Quality.SIMULATED else Quality.MEASURED), "%")
-                Metric("Cell min", Q.of(b.cellMin, Quality.MEASURED), "V", 3); Metric("Cell max", Q.of(b.cellMax, Quality.MEASURED), "V", 3); Metric("Δ cell", Q.of(b.cellDelta?.times(1000), Quality.MEASURED), "mV")
+                val mq = if (sim) Quality.SIMULATED else Quality.MEASURED
+                Metric("SoC", Q.of(b.socPct, mq), "%"); Metric("SoH", Q.of(b.sohPct, mq), "%")
+                Metric("Cell min", Q.of(b.cellMin, mq), "V", 3); Metric("Cell max", Q.of(b.cellMax, mq), "V", 3); Metric("Δ cell", Q.of(b.cellDelta?.times(1000), if (sim) Quality.SIMULATED else Quality.CALCULATED), "mV")
             }
             Canvas(Modifier.fillMaxWidth().height(110.dp)) {
                 val n = b.cells.size.coerceAtLeast(1); val w = size.width / n; val mn = 3.0; val mx = 4.25
                 b.cells.forEachIndexed { i, v -> val h = ((v - mn) / (mx - mn)).toFloat().coerceIn(0.02f, 1f) * size.height
                     drawRect(if (v == b.cellMin) K.Warn else K.Accent, Offset(i * w + 1, size.height - h), Size(w - 2, h)) }
             }
-            if (b.temps.isNotEmpty()) Text("Pack temps: " + b.temps.joinToString { "%.1f°C".format(it) }, color = p.text)
+ if (b.temps.isNotEmpty()) Text((if (sim) "[SIM] " else "") + "Pack temps: " + b.temps.joinToString { "%.1f°C".format(it) }, color = p.text)
             b.status?.let { Text("BMS status: $it", color = p.textDim) }
         } ?: Text(if (caps.bms) "BMS: waiting for data" else "BMS: not detected (no COMM_BMS_GET_VALUES reply)", color = p.textDim, modifier = Modifier.padding(top = 8.dp))
         SectionTitle("Controller & link")

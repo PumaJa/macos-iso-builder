@@ -53,6 +53,11 @@ class TelemetryTest {
         assertNotNull(e.whPerKm(last)); assertNotNull(e.rangeKm(last))
     }
 
+    @Test fun noVehicleProfileMeansNoWheelSpeed() {
+        val s = TelemetryEngine(dt.copy(configured = false), false).process(0, vals(56000.0), null, null, null)
+        assertFalse(s.speedMps.isAvailable); assertFalse(s.motorRpm.isAvailable); assertTrue(s.erpm.isAvailable)
+    }
+
     @Test fun socCurveMonotonic() {
         var prev = -1.0
         for (mv in 2900..4300 step 10) { val s = Calc.socFromCellVoltage(mv / 1000.0); assertTrue(s >= prev); prev = s }

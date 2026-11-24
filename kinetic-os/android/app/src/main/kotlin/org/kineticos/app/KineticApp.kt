@@ -7,7 +7,7 @@ class KineticApp : Application() {
     lateinit var graph: AppGraph; private set
     override fun onCreate() {
         super.onCreate()
-        MapLibre.getInstance(this)
+        runCatching { MapLibre.getInstance(this) } // native map engine; absent in JVM unit tests
         graph = AppGraph(this)
     }
 }

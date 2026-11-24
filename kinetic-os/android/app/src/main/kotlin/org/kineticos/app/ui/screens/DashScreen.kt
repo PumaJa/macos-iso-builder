@@ -81,17 +81,19 @@ fun DashScreen(go: (Screen) -> Unit) {
             }
         }
         val main: @Composable (Modifier) -> Unit = { m ->
-            Box(m, contentAlignment = Alignment.Center) {
-                PowerArc((kotlin.math.abs(pw) / maxP).toFloat(), pw < 0, Modifier.fillMaxWidth(0.95f).aspectRatio(2f).align(Alignment.TopCenter), simulated)
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 24.dp)) {
+            Column(m, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Box(Modifier.fillMaxWidth(0.95f).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
+                    PowerArc((kotlin.math.abs(pw) / maxP).toFloat(), pw < 0, Modifier.fillMaxSize(), simulated)
                     val sp = s?.speedMps ?: Q.NA
-                    Text(fmt(sp, 0, speedScale), style = numStyle(if (landscape) 120 else 104, FontWeight.Thin), color = qColor(sp.quality, p.text))
-                    Text("$speedUnit · ${s?.speedSource?.uppercase() ?: "—"}", style = labelStyle(12), color = p.textDim)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(fmt(power, 1, pScale), style = numStyle(36), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
-                        Text(" $pUnit", style = labelStyle(12), color = p.textDim)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(fmt(sp, 0, speedScale), style = numStyle(if (landscape) 110 else 96, FontWeight.Thin), color = qColor(sp.quality, p.text), maxLines = 1)
+                        Text("$speedUnit · ${s?.speedSource?.uppercase() ?: "—"}", style = labelStyle(12), color = p.textDim)
                     }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(fmt(power, 1, pScale), style = numStyle(40), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
+                    Text(" $pUnit  ${if (pw < 0) "REGEN" else "POWER"}", style = labelStyle(12), color = p.textDim)
                 }
             }
         }

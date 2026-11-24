@@ -56,7 +56,8 @@ class SafetyGate(
         listOf(target.powerFraction, target.motorCurrentFraction, target.batteryCurrentFraction, target.regenFraction).forEach {
             if (it !in 0.0..1.0) reasons += "Profile fraction $it outside 0..1"
         }
-        val raising = current == null || isMorePowerful(target, current)
+        // No mode applied yet = controller runs its stored (stock) limits, i.e. the most powerful state.
+        val raising = isMorePowerful(target, current ?: STOCK)
         val speed = live.speedKmh ?: live.erpm?.let { abs(it) * vehicle.kmhPerKiloErpm / 1000 }
         if (raising && (speed == null || speed > stationaryKmh))
             reasons += "Increasing power is only allowed at standstill (< ${stationaryKmh} km/h)"
@@ -106,6 +107,8 @@ class SafetyGate(
         a.powerFraction > b.powerFraction || a.motorCurrentFraction > b.motorCurrentFraction ||
             a.batteryCurrentFraction > b.batteryCurrentFraction ||
             (a.speedLimitKmh ?: Double.MAX_VALUE) > (b.speedLimitKmh ?: Double.MAX_VALUE)
+
+    companion object { val STOCK = RideProfile("stock", "STOCK", builtIn = true) }
 
     fun backup(fw: FirmwareInfo, conf: McConfTemp) = McConfBackup(fw.uuidHex, clock(), fw.versionString, conf)
 }

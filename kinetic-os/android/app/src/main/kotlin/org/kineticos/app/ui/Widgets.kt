@@ -97,9 +97,9 @@ fun BigButton(text: String, modifier: Modifier = Modifier, selected: Boolean = f
         modifier.heightIn(min = h).clip(RoundedCornerShape(14.dp))
             .background(if (selected) color.copy(alpha = 0.18f) else p.surface2)
             .border(if (selected) 2.dp else 1.dp, if (selected) color else p.grid, RoundedCornerShape(14.dp))
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp),
+            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = labelStyle(15), color = if (!enabled) p.textDim else if (selected) color else p.text, textAlign = TextAlign.Center) }
+    ) { Text(text, style = labelStyle(14).copy(letterSpacing = 1.sp), color = if (!enabled) p.textDim else if (selected) color else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
 
 @Composable

@@ -7,6 +7,8 @@ import kotlin.math.*
 data class Drivetrain(
     val polePairs: Int, val gearRatio: Double, val wheelDiameterM: Double,
     val batteryCellsSeries: Int? = null, val batteryCapacityAh: Double? = null, val batteryNominalV: Double? = null,
+    /** false = no vehicle profile yet → wheel speed / motor rpm cannot be derived and are reported UNAVAILABLE. */
+    val configured: Boolean = true,
 )
 
 object Calc {
@@ -51,7 +53,7 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         val cq = if (simulated) Quality.SIMULATED else Quality.CALCULATED
         val eq = if (simulated) Quality.SIMULATED else Quality.ESTIMATED
 
-        val vescSpeed = v?.erpm?.takeIf { !it.isNaN() }?.let { Calc.wheelSpeedMps(it, drivetrain) }
+        val vescSpeed = v?.erpm?.takeIf { !it.isNaN() && drivetrain.configured }?.let { Calc.wheelSpeedMps(it, drivetrain) }
         val gpsSpeed = gps?.speedMps?.takeIf { (gps.accuracyM ?: 99.0) < 25 }
         val (speed, src, sq) = when {
             vescSpeed != null -> Triple(abs(vescSpeed), "vesc", cq)
@@ -85,7 +87,7 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         return TelemetrySample(
             t = t, simulated = simulated,
             speedMps = Q.of(speed, sq), speedSource = src,
-            motorRpm = Q.of(v?.erpm?.let { Calc.motorRpm(it, drivetrain.polePairs) }, cq),
+            motorRpm = Q.of(v?.erpm?.takeIf { drivetrain.configured }?.let { Calc.motorRpm(it, drivetrain.polePairs) }, cq),
             erpm = Q.of(v?.erpm, mq),
             motorPowerW = Q.of(motorP, eq), batteryPowerW = Q.of(battP, cq),
             motorCurrentA = Q.of(v?.motorCurrentA, mq), batteryCurrentA = Q.of(v?.inputCurrentA, mq),

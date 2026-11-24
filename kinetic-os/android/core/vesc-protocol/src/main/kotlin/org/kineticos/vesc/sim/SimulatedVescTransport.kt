@@ -33,7 +33,7 @@ class SimulatedVescTransport(
     var throttle = 0.0  // 0..1 driven by the simulator loop / tests
     private var erpm = 0.0; private var ah = 0.0; private var wh = 0.0; private var whRegen = 0.0; private var tach = 0
     private var tempFet = 25.0; private var tempMotor = 25.0; private var lastStep = clock()
-    private var maxScale = 1.0; private var wattMax = 15000.0; private var maxErpm = 60000.0
+    private var maxScale = 1.0; private var wattMax = 15000.0; private var maxErpm = 50000.0
     val polePairs = 7; val gear = 8.0; val wheelD = 0.48
     val writesReceived = mutableListOf<Int>()
 

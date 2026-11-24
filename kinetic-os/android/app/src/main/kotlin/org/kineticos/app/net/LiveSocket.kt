@@ -48,6 +48,7 @@ class LiveSocket(private val api: Api, private val baseUrl: () -> String, privat
                         }
                         _messages.tryEmit(o)
                     }
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, null); closed.complete("closed by server $code") }
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { closed.complete("closed $code") }
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { closed.complete(t.message ?: "failure ${response?.code}") }
                 })

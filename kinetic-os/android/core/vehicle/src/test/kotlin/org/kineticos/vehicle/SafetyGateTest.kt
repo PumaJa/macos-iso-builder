@@ -37,6 +37,11 @@ class SafetyGateTest {
         assertIs<GateDecision.Denied>(d)
     }
 
+    @Test fun fromStockReductionWhileMovingAllowedButNotIncrease() {
+        assertIs<GateDecision.Allowed>(gate.planRideMode(fw, backup, null, RideProfile.ECO, vehicle, moving))
+        assertIs<GateDecision.Denied>(gate.planRideMode(fw, backup, RideProfile.ECO, RideProfile.SPORT, vehicle, moving))
+    }
+
     @Test fun reducingPowerWhileMovingAllowed() {
         assertIs<GateDecision.Allowed>(gate.planRideMode(fw, backup, RideProfile.RACE, RideProfile.ECO, vehicle, moving))
     }

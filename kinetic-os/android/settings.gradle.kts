@@ -3,7 +3,7 @@ pluginManagement {
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+    repositories { mavenLocal(); google(); mavenCentral() }
 }
 rootProject.name = "KineticOS"
 include(
