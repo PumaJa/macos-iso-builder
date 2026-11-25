@@ -44,6 +44,17 @@ Install: connect to the VESC, open **VESC Packages** (sidebar), use **Load Custo
 | v-auto-margin | 3.0 | V |
 | default mode fractions | see `m-*` lists | edit tables |
 
+## Anti-theft lock
+Phone-independent immobilizer, enforced on the VESC (commands 4/5/6 in `protocol.md`).
+- Setup: set a PIN once (`cmd 6`, 4-8 digits), then `cmd 4` lock while stationary. `cmd 5` unlocks.
+- Locked: the lock flag is stored in EEPROM (survives power cycles). At boot the script reads it first and immediately calls `(app-disable-output -1)` (stops ADC/PPM/UART apps driving the motor) and sets `l-current-max-scale` to 0 (RAM only, no `conf-store`). The main loop re-asserts output-off every cycle. Mode changes and derating can never re-enable output. The script never calls `set-current` or `set-brake`: the motor freewheels (the lock does not hold the wheel).
+- Wrong PIN: 5 consecutive failures lock out all PIN commands for 60 s, doubling per further series, capped at 1 h. The timer is RAM only (a power cycle resets it, not the lock).
+- TAMPER: while locked, |ERPM| >= `stop-erpm` for more than 1 s sets a tamper flag (status byte 17 bit2), cleared on unlock. RAM only; the phone must poll status to see it. Nothing sounds an alarm.
+- PIN storage: EEPROM address 101 holds `PIN xor 0x5A17C3E9`, lock flag at address 100. This is obfuscation, not encryption.
+- Recovery if the PIN is lost: VESC Tool -> LispBM -> stop/erase the script, and clear or overwrite EEPROM variables 100 and 101 (e.g. run `(eeprom-store-i 100 0)`), or reflash the VESC firmware (EEPROM does not survive firmware updates). Do not re-run the script without power-cycling while locked: conf was set to 0, and the script would read that as the new boot ceiling (power cycle restores the stored config).
+- Honest limits: anyone with USB/CAN access and VESC Tool can read the EEPROM, stop the script, or just run `set-current`/write the motor config; the lock is a deterrent against casual theft and throttle-only attacks, not a security boundary. A different VESC app (or a CAN master / BMS / second controller) is not affected. EEPROM writes stop the motor briefly and are limited to ~100,000 per cell; the script writes only on lock, unlock and set-PIN.
+- Not hardware tested; verify with the wheel off the ground that (app-disable-output -1) really blocks your throttle app, and that `l-current-max-scale` 0 is accepted by your firmware.
+
 ## Not implemented
 - **Forward/reverse crawl mode**: not implemented in LispBM. It needs app-level and hardware validation (reverse limits, direction handling, `l-min-erpm`). Document-only.
 - Speed limit uses `l-max-erpm`; `max-speed` (m/s) is not touched. Reverse limits (`l-min-erpm`, `l-current-min-scale`) are untouched.
@@ -61,9 +72,9 @@ Install: connect to the VESC, open **VESC Packages** (sidebar), use **Load Custo
 
 Run: `./test/run_tests.sh` (clones/builds the REPL under `/tmp/claude-0/lbm/src` if missing; override with `LBM_SRC=` or `LBM_REPL=`; needs git, gcc, make, libreadline-dev, libpng-dev). It exits non-zero on any failure. Manual build: `cd <lispBM>/repl && make FEATURES="64"`.
 
-Files: `test/stubs.lisp` (fake `conf-get`/`conf-set`/`get-temp-fet`/`get-temp-mot`/`get-vin`/`get-rpm`/`send-data`/`event-enable` with controllable state and call logs), `test/run_tests.lisp` (141 assertions), `test/smoke.lisp` (end-to-end driver).
+Files: `test/stubs.lisp` (fake `conf-get`/`conf-set`/`get-temp-fet`/`get-temp-mot`/`get-vin`/`get-rpm`/`send-data`/`event-enable` with controllable state and call logs), `test/run_tests.lisp` (223 assertions), `test/smoke.lisp` and `test/smoke_locked.lisp` (end-to-end drivers, the second boots with the lock flag already in EEPROM).
 
-Checked (141 assertions + 5 smoke checks, all passing):
+Checked (223 assertions + 9 smoke checks, all passing):
 - Core syntax actually accepted by the interpreter: `defun`, `define` (also inside functions, sets the global), `let`, `cond` with `t`, `if`, `{ }` blocks, `and`/`or`/`not`, `ix`/`first`/`rest`/`cons`, `to-i`/`to-float`, `bufcreate`, `bufget/bufset` u8/i8/u16/u32/i32 (big-endian), `spawn`, `recv` pattern `(event-data-rx . (? data))` with `_` fallthrough, `loopwhile`.
 - Boot ceiling read from `conf-get`, auto voltage thresholds, eco applied at start.
 - Every `conf-set` value stays <= boot ceiling (incl. ceiling scale 0.8, custom params of 65535/0xFFFFFFFF, hot and cold ticks).
@@ -73,12 +84,15 @@ Checked (141 assertions + 5 smoke checks, all passing):
 - Rate limiter: -0.10/tick down, +0.02/tick up, floor, recovery to mode scale.
 - Status reply: 17-byte layout byte-by-byte against `protocol.md` (big-endian, signed temps/erpm), all 1001 permille and 400 vin values round-trip.
 - Protocol v2 (u32 watts, 16-byte cmd 2): 120000 W accepted exactly, 4e9 W clamped to the ceiling, field byte order, short/bad-slot rejects, replies echo request version; v1 (u16 watts, 14-byte cmd 2) still works unchanged.
+- Anti-theft lock: lock refused while moving / without PIN / wrong PIN; PIN validation (4-8 digits) and XOR storage; lock persists across a simulated reboot (EEPROM flag re-read, output disabled, scale 0); output stays disabled and scale 0 while locked through ticks, derating and mode attempts (cmd 1/2/6 -> code 11); unlock wrong-PIN counting, 60 s lockout, doubling, 1 h cap, RAM-only timer; tamper set after > 1 s motion and cleared on unlock; 19-byte reply with lock flags and lockout seconds.
 - Bad magic / version not 1 or 2 / too short: no reply, no state change, no `conf-set`.
 - Event handler thread via real `spawn`/`recv`/`send`; and the unmodified full script (autostart + forever loop) under a driver thread.
 
 Not checked (needs real VESC firmware): that your firmware's LispBM is new enough for these constructs (the REPL is newer than most VESC releases), `conf-set` semantics and range checks for each parameter (the stub accepts any number; real FW may need `conf-store`/`conf-set` ordering, or ignore/limit values), whether `l-current-max-scale` etc. take effect immediately in the running motor controller, `event-data-rx` payload format and `send-data` routing over BLE, real sensor units/ranges (`get-rpm` is ERPM; `get-temp-mot` may be -1 or 0 without a sensor), timing/CPU load of the 0.1 s loop, and heap/stack limits on the VESC.
 
 ## Verified against the official docs (vedderb/bldc lispBM/README.md)
+Also verified in the VESC README for the lock: `(app-disable-output ms)` (0 = enable now, -1 = disable forever, FW 6.00+), `eeprom-store-i addr n` / `eeprom-read-i addr` (i32, addr 0..127, 256 on FW 6.06; unwritten reads return nil; ~100,000 writes; motor stops briefly while writing). `bitwise-xor`, `pow` are core LispBM, not in that README.
+
 Present: `conf-set`, `conf-get`, `conf-store` (not used), `get-temp-fet`, `get-temp-mot`, `get-vin`, `get-rpm`, `send-data`, `event-register-handler`, `event-enable`, `event-data-rx` (data = byte array), `bufget-i8/u8/i16/u16/i32/u32/f32`, `bufset-*`, `buflen`, `bufcreate`, `loopwhile`, `spawn`, `recv`, `sleep`, `abs`, and config params `l-current-max-scale`, `l-watt-max`, `l-in-current-max`, `l-max-erpm`, `l-battery-cut-start`.
 
 Uncertain (core LispBM, not documented in that README): `defun`, `define`, `let`, `cond`, `if`, `and`/`or`/`not`, `first`/`rest`/`cons`/`ix`, `to-i`, `to-float`, `{ }` progn blocks. `bufset-i8` assumed (docs list bufset-i8). Redefining globals with `define` inside functions is assumed to work. `bufget-u32` returns possibly large values; fine for erpm < 2^28. Written with `get-batt` not used.

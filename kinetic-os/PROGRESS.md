@@ -22,3 +22,4 @@
 | 2026-11-25 | Forum research (subagent) + decisions | docs/USER_WISHES.md, 9 wishes built, 3 declined with reasons |
 | 2026-11-25 | PiP cockpit, warnings (TTS/vibration), dash tiles, sun theme, chemistry + coulomb SoC | tests green |
 | 2026-11-25 | App ↔ on-vehicle script bridge, VESC setup check, kinetic.vescpkg (subagent built VESC Tool 7.01) | E2E via simulator green |
+| 2026-11-25 | Anti-theft lock (LispBM via subagent + app/server/sim) | 223+9 LispBM, 145 Android, 52 server green; vescpkg rebuilt |

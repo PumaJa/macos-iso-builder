@@ -49,3 +49,30 @@
 
 ;; event-register-handler is a built-in special form in the REPL; not stubbed.
 (defun event-enable (e) (define stub-events (cons e stub-events)))
+
+;; app-disable-output: ms, 0 = enable now, -1 = disable forever (verified in VESC README).
+(define stub-out-disabled nil)   ; t while app output is (stubbed as) disabled
+(define stub-out-log nil)        ; every ms argument, newest first
+(defun app-disable-output (ms)
+  {
+    (define stub-out-log (cons ms stub-out-log))
+    (define stub-out-disabled (if (= ms 0) nil t))
+    t
+  })
+
+;; eeprom-store-i / eeprom-read-i: addr 0..127, i32; read of unwritten addr = nil.
+(define stub-eeprom nil)         ; alist addr -> value (persists across simulated reboots)
+(define stub-eeprom-writes 0)
+(defun eeprom-store-i (addr v)
+  {
+    (if (or (< addr 0) (> addr 127)) (exit-error (list 'stub-bad-eeprom-addr addr)) nil)
+    (if (not (eq (type-of v) 'type-i)) (exit-error (list 'stub-eeprom-not-i32 addr v)) nil)
+    (define stub-eeprom (setassoc stub-eeprom addr v))
+    (define stub-eeprom-writes (+ stub-eeprom-writes 1))
+    t
+  })
+(defun eeprom-read-i (addr)
+  {
+    (if (or (< addr 0) (> addr 127)) (exit-error (list 'stub-bad-eeprom-addr addr)) nil)
+    (assoc stub-eeprom addr)
+  })

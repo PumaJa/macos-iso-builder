@@ -22,7 +22,7 @@
         (looprange p (+ (self) 1) (+ (self) 1500) (send p (cons 'event-data-rx b)))
       })
     (sleep 0.5)
-    (smoke-check "status reply sent through handler (17 bytes)" (and (= (length stub-sent) 1) (= (buflen (ix stub-sent 0)) 17)))
+    (smoke-check "status reply sent through handler (19 bytes)" (and (= (length stub-sent) 1) (= (buflen (ix stub-sent 0)) 19)))
     (smoke-check "status flags show FET derate" (= (bufget-u8 (ix stub-sent 0) 7) 1))
     (if (= smoke-fail 0) (print "SMOKE-ALL-OK") (print "SMOKE-FAILED"))
   }))

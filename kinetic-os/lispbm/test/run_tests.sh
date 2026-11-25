@@ -35,5 +35,10 @@ timeout 8 stdbuf -o0 "$REPL" --terminate --silent -H 16384 -M 131072 -s "$HERE/s
 grep -E '^SMOKE|^ +Error' "$WORK/smoke.out"
 grep -q '^SMOKE-ALL-OK' "$WORK/smoke.out" || { rc=1; echo "smoke test FAILED; raw output tail:"; tail -30 "$WORK/smoke.out"; }
 
+echo "== smoke test: boot with lock flag already in EEPROM =="
+timeout 8 stdbuf -o0 "$REPL" --terminate --silent -H 16384 -M 131072 -s "$HERE/stubs.lisp" -s "$HERE/smoke_locked.lisp" -s "$SCRIPT" >"$WORK/smoke2.out" 2>&1
+grep -E '^SMOKE|^ +Error' "$WORK/smoke2.out"
+grep -q '^SMOKE-ALL-OK' "$WORK/smoke2.out" || { rc=1; echo "locked smoke FAILED; raw output tail:"; tail -30 "$WORK/smoke2.out"; }
+
 [ $rc -eq 0 ] && echo "ALL OK" || echo "FAILURES"
 exit $rc
