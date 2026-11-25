@@ -94,7 +94,7 @@ class VehicleConnection(
                     Log.w("VehicleConn", "link error", e)
                     _events.tryEmit("Connection: ${e.message}")
                 } finally {
-                    _linkHealthy.value = false
+                    clearLive()
                     client?.stop(); client = null
                     withContext(NonCancellable) { runCatching { t.disconnect() } }
                 }
@@ -131,7 +131,10 @@ class VehicleConnection(
         }
     }
 
-    fun stop() { job?.cancel(); job = null; _status.value = ConnStatus.Idle; _linkHealthy.value = false; _script.value = null }
+    fun stop() { job?.cancel(); job = null; _status.value = ConnStatus.Idle; clearLive() }
+
+    /** Never show values of a previous link as if they were live. */
+    private fun clearLive() { _linkHealthy.value = false; _script.value = null; _sample.value = null; _lastValues.value = null }
 
     private suspend fun session(c: VescClient, t: VescTransport): Unit = coroutineScope {
         val fw = c.firmware()
