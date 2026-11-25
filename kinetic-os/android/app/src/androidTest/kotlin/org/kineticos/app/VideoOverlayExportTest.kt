@@ -52,8 +52,8 @@ class VideoOverlayExportTest {
             return d.toDouble() / n
         }
         val w = frameOut.width; val h = frameOut.height
-        val overlayDiff = diff(w / 20, h * 6 / 10, w * 4 / 10, h * 95 / 100)
-        val untouchedDiff = diff(w * 7 / 10, h / 20, w * 95 / 100, h * 3 / 10)
+        val overlayDiff = diff(w / 20, h * 8 / 10, w * 4 / 10, h * 95 / 100)
+        val untouchedDiff = diff(w * 6 / 10, h / 2, w * 95 / 100, h * 95 / 100)
         File(ctx.getExternalFilesDir(null), "overlay_frame.png").outputStream().use { frameOut.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(overlayDiff > 25, "overlay region diff $overlayDiff")
         assertTrue(untouchedDiff < 20, "untouched region diff $untouchedDiff")

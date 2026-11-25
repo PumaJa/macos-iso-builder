@@ -65,7 +65,10 @@ object AlertNotifier {
         return true
     }
 
-    fun schedule(ctx: Context, enabled: Boolean) {
+    /** Never throws: a WorkManager problem must not take down the cockpit runtime (live WS alerts still work). */
+    fun schedule(ctx: Context, enabled: Boolean) = runCatching { scheduleInternal(ctx, enabled) }.isSuccess
+
+    private fun scheduleInternal(ctx: Context, enabled: Boolean) {
         val wm = WorkManager.getInstance(ctx)
         if (!enabled) { wm.cancelUniqueWork(WORK); return }
         val req = PeriodicWorkRequestBuilder<AlertPollWorker>(15, TimeUnit.MINUTES)

@@ -1,4 +1,4 @@
-# Test results (2026-11-24)
+# Test results (updated 2026-11-25)
 
 Three levels, kept strictly apart:
 * **A – automated** (JVM unit/Robolectric, server vitest, real PostGIS)
@@ -8,14 +8,15 @@ Three levels, kept strictly apart:
 ## A – Automated
 | Suite | Tests | Result | Covers |
 |---|---|---|---|
-| core:vesc-protocol | 22 | ✅ | CRC vector, framing (short/long/very long), 200 random packets with random fragmentation, corruption + resync, garbage fuzz, float32_auto round-trip, GET_VALUES (FW 6/7 + old FW tail missing), FW_VERSION, BMS, MCCONF_TEMP layout, FORWARD_CAN, client via simulator: fragmentation, CAN ping/forward, dropped replies/retry, CRC injection, timeout, single-use WriteToken |
-| core:telemetry | 10 | ✅ | speed from ERPM, PS/hp/kW, quality tags (CALC/EST/SIM/N/A), GPS fallback & accuracy rejection, trip energy/distance, range, SoC curve, adaptive poller, unconfigured drivetrain → no speed |
-| core:vehicle | 11 | ✅ | SafetyGate: never exceeds backup, RAM-only, standstill rule, reductions while moving, fault/link/firmware/UUID refusals, locked assistance features, derating, exact restore; throttle curves; vehicle validation |
-| core:racing | 35 | ✅ | geo math, gate crossings, laps at 1 Hz/10 Hz both directions, sectors, min-lap, invalid laps, best/delta, ghost, accel runs, leaderboard |
-| core:export | 25 | ✅ | CSV RFC4180 round-trip, JSON meta, GPX export/import round-trip, XXE/billion-laughs rejection, ride summary math |
-| app (JVM + Robolectric) | 14 | ✅ | REST (MockWebServer) auth/errors; WebSocket join/ping/member parsing/**server-close reconnect**; telematics mapping never invents values; Room recorder (resume after process death, never mixes simulated data), backups; route guidance/GPX; **Compose UI with simulator**: offline dash, SIM labels, ECO applied through SafetyGate, RACE refused while moving; telemetry/modes/garage/settings/connect render |
-| server (vitest) | 43 | ✅ | validation, codes, auth (alg=none rejected), access rules, online calc, alert logic, WS validation/rate limits, app routes, **integration against postgis/postgis:16-3.4** |
-| **Total** | **160** | ✅ | |
+| core:vesc-protocol | 24 | ✅ | CRC vector, framing (short/long/very long), random fragmentation, corruption + resync, garbage fuzz, float32_auto, GET_VALUES (FW 6/7 + old FW), FW_VERSION, BMS, MCCONF_TEMP layout, FORWARD_CAN, **DECODED_ADC**, simulator: CAN, retries, CRC injection, timeout, WriteToken, **odometer/throttle** |
+| core:telemetry | 11 | ✅ | speed from ERPM, units, quality tags, GPS fallback, energy/distance, range, SoC curve, adaptive poller, unconfigured drivetrain, **throttle/odometer tagging** |
+| core:vehicle | 11 | ✅ | SafetyGate (never exceeds backup, RAM-only, standstill rule, refusals, locked assistance, derating, restore), throttle curves, validation |
+| core:racing | 35 | ✅ | geo, gate crossings, laps 1/10 Hz, sectors, ghost, accel, leaderboard |
+| core:export | 26 | ✅ | CSV/JSON/GPX round trips, XXE rejection, ride summary, **CSV formula-injection guard** |
+| app (JVM + Robolectric) | 20 | ✅ | REST/WS (reconnect), telematics mapping, Room recorder, route guidance, **OSRM parsing + turn-by-turn**, **alert notifications (dedupe, channel)**, **overlay timeline + renderer**, Compose UI with simulator |
+| server (vitest) | 50 | ✅ | incl. **/route OSRM proxy (7 tests)** and integration against postgis/postgis:16-3.4 |
+| LispBM (real LispBM 0.41 interpreter) | 141 + 5 smoke | ✅ | ceiling, mode accept/reject rules, clamping, derating, rate limiter, status byte layout, protocol v1/v2 |
+| **Total** | **318** | ✅ | |
 
 Bugs found by these tests and fixed: decoder stall on corrupted length field; SafetyGate refusing ECO from stock while moving;
 WebSocket not reconnecting after server-initiated close; simulated BMS values tagged MEAS; meaningless wheel speed without vehicle profile.
@@ -31,9 +32,12 @@ UI screenshots: Robolectric renders `docs/screenshots/{dash_*,telemetry_*,modes,
 | Nightly backup container writes `pg_dump` | ✅ (first dump at start) |
 | Web dashboard in headless Chromium: loads, Leaflet (SRI) loads, no JS errors | ✅ |
 | Caddy HTTPS profile | ⚠ config validated only (no public domain here) |
+| **Instrumented on emulator:** MP4 overlay export (Media3 Transformer, real encoder) | ✅ 4 s test video → MP4 with burned-in overlay, audio kept, overlay region changed, rest of frame unchanged; telemetry at 2.0 s shows the correct sample (`docs/screenshots/emulator_mp4_overlay_frame.png`) |
+| OSRM routing end-to-end (docker) | ✅ Zurich extract: 7.1 km, 17 steps via `/api/v1/route`; 401/400/503 paths |
 | Android emulator (API 30 x86_64, **software CPU emulation – no KVM on this machine**) | ✅ release APK installs & launches; Connect → START SIMULATOR → "Online: SIM_VESC · FW 6.06 · CAN 1"; dash shows SIM/REC/GPS; app restart auto-reconnects; no app crashes after fix |
 | Emulator finding #1 (fixed) | `startForegroundService` deadline missed on slow device → crash/ANR. Fixed: plain `startService` from foreground, lazy app init, FGS-type fallback |
-| Emulator finding #2 (environment) | Map tiles not loaded: emulator does not trust this sandbox's TLS-inspecting proxy CA (`CertPathValidatorException`). The app now shows the error instead of a blank map. Not an app defect – verify tiles on a real device |
+| Emulator finding #2 (environment) | Map tiles could not be loaded in this sandbox (direct: TLS interception; via proxy: proxy only reachable on host loopback). The app shows the error instead of a blank map. **Map rendering remains unverified – check on a real device.** |
+| Finding #3 (fixed) | WorkManager init failure could cancel the runtime coroutine → `AlertNotifier.schedule` made non-throwing |
 
 ## H – Hardware
 Nothing validated on real hardware. Status of every hardware-dependent feature in FEATURE_MATRIX.md is "IH".
