@@ -28,4 +28,4 @@
 - [x] Keystore-encrypted token storage
 - [x] Throttle (GET_DECODED_ADC), VESC odometer, CSV formula-injection guard
 - [x] Emulator run (software emulation): app, simulator, map, MP4 export
-- [ ] Release signing key for distribution
+- [x] Release signing via keystore.properties / env (tools/make-release-key.sh), ABI split APKs

@@ -34,7 +34,7 @@ describe('ws message validation', () => {
     expect(base64DecodedSize('AA==')).toBe(1);
   });
   it('vehicle_state embeds full state validation; subscribe needs uuid', () => {
-    const state = { ts: 1, vescConnected: false, source: 'simulated' };
+    const state = { ts: Date.now(), vescConnected: false, source: 'simulated' };
     expect(parse({ type: 'vehicle_state', vehicleId: gid, state }).ok).toBe(true);
     expect(parse({ type: 'vehicle_state', vehicleId: gid, state: { ts: 1 } }).ok).toBe(false);
     expect(parse({ type: 'subscribe_vehicle', vehicleId: gid }).ok).toBe(true);
@@ -53,5 +53,22 @@ describe('RateLimiter (5 Hz)', () => {
     expect(r.allow(1100)).toBe(false);
     expect(r.allow(1200)).toBe(true);
     expect(r.allow(1399)).toBe(false);
+  });
+});
+
+import { TokenBucket, plausibleTs } from '../src/logic/wsMessages';
+describe('flood protection and timestamp plausibility', () => {
+  it('token bucket allows bursts then throttles, refills over time', () => {
+    const b = new TokenBucket(10, 20, 0);
+    let ok = 0; for (let i = 0; i < 30; i++) if (b.take(1, 0)) ok++;
+    expect(ok).toBe(20);
+    expect(b.take(10, 0)).toBe(false);
+    expect(b.take(10, 1000)).toBe(true);
+  });
+  it('rejects implausible timestamps', () => {
+    const now = Date.UTC(2026, 10, 25);
+    expect(plausibleTs(now, now)).toBe(true);
+    expect(plausibleTs(now + 11 * 60_000, now)).toBe(false);
+    expect(plausibleTs(1000, now)).toBe(false);
   });
 });

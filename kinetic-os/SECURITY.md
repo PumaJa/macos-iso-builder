@@ -5,10 +5,10 @@
 |---|---|
 | Throttle, brakes, motor control never depend on the phone | App sends **no** `SET_CURRENT/DUTY/RPM` commands at all. Only `SET_MCCONF_TEMP` (limits) is ever written. |
 | Writes only through one audited path | `SafetyGate` issues a single-use `WriteToken`; `VescClient.writeAckedChecked` requires it. UI code cannot build writes. |
-| Never exceed configured hardware limits | On every connect the stored runtime limits are read (`GET_MCCONF_TEMP`) and the **first** backup per controller UUID is kept forever. All mode values are fractions ≤ 1 of that backup; firmware additionally clamps current scales to 0..1. |
+| Never exceed configured hardware limits | On every connect the runtime limits are read (`GET_MCCONF_TEMP`) and reconciled with the backup: if the VESC rebooted since the app's last write (VESC uptime), the fresh values *are* the stored config and replace the backup (so lowering limits in VESC Tool is always respected); without uptime (old FW) the element-wise minimum is used. Controllers without a UUID are refused. All mode values are fractions ≤ 1 of that backup; firmware additionally clamps current scales to 0..1. |
 | Reversible | `store = 0` on every write → RAM only. Power-cycling the VESC returns to stock. "Restore stock" re-writes the backup exactly. |
 | Incompatible firmware | Writes blocked unless FW 5.03–7.x (layout verified in source) and the backup UUID matches the connected controller. |
-| Safe states only | Power increases only below 2 km/h; reductions always allowed. No writes during faults or with an unhealthy link. |
+| Safe states only | Power increases (incl. stronger regen, higher reverse speed, *restore stock* and derating recovery) only below 2 km/h with known speed; unknown speed = moving. While moving a mode change reduces drive power immediately and holds regen until standstill. One mutex serialises all writes; a failed/unconfirmed write is treated as "stock" (most powerful) for the next decision. If the vehicle script was seen but stops answering, the app refuses to write instead of bypassing it. Script/lock replies must echo the command and show the expected state. |
 | Unvalidated assistance | Virtual flywheel, traction control, wheelie control are refused by the gate until hardware validation exists. |
 | Link loss | Limits stay as last applied (≤ stock). The LispBM script keeps derating locally without the phone. |
 | Simulated data | Never mixed into real rides; flagged `source:"simulated"` in telematics; magenta UI. |

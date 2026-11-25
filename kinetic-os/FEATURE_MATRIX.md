@@ -130,6 +130,12 @@ erforderlich · **NS** = Nicht unterstützt.
 | VESC-Paket `kinetic.vescpkg` (mit VESC Tool 7.01 gebaut) | TI – gebaut und strukturell geprüft, nicht in VESC Tool geladen |
 | Diebstahlsperre (Wegfahrsperre im VESC-Skript, PIN, übersteht Neustart, nur im Stand, Schiebe-/Abschlepp-Erkennung → Alarm am Zweithandy) | IT (Simulator-E2E, Server, LispBM-Interpreter) / IH |
 
+## Bedienung & Verteilung
+| Funktion | Status |
+|---|---|
+| Deutsche und englische Oberfläche (Systemsprache) | IT (Render-Test DE) – Meldungen aus der Kernlogik noch englisch |
+| Eigene Release-Signatur (keystore.properties / Umgebungsvariablen), APKs pro Architektur | IT (signierter Build geprüft) |
+
 ## Was NICHT nachgebildet wird
 Originale Stark-Grafiken, Logos, Schriften, Fahrzeugdarstellung, Menütexte oder Quellcode (urheber-/markenrechtlich geschützt,
 keine APK bereitgestellt). Das UI ist eine eigenständige Gestaltung nach demselben Bedienkonzept (großes Tacho, Modus-Schnellwahl,

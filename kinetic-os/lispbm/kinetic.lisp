@@ -24,6 +24,8 @@
 (define ea-lock 100)               ; EEPROM addr (0..127): 1 = locked
 (define ea-pin  101)               ; EEPROM addr: PIN xor pin-key (obfuscation only, NOT crypto)
 (define pin-key 0x5A17C3E9)
+(define ea-fails  102)             ; EEPROM addr: persisted consecutive-failure count (== max-fails: lockout pending)
+(define ea-series 103)             ; EEPROM addr: persisted lockout level (0 = none; duration 60 s * 2^(level-1), cap 1 h)
 (define max-fails 5)               ; consecutive wrong PINs before lockout
 (define lockout-base 60.0)         ; s, doubles per further failure series
 (define lockout-cap 3600.0)        ; s
@@ -64,11 +66,21 @@
 (define tamper 0)
 (define tamper-t 0.0)
 (define lock-reassert 0)
+(define ep-cnt 0)        ; mirrors of the EEPROM values (skip identical writes)
+(define ep-series 0)
+(defun lockout-dur (series) (kmin lockout-cap (* lockout-base (pow 2.0 (to-float (- series 1))))))
 (defun lock-boot ()
   {
     (define locked (if (eq (eeprom-read-i ea-lock) 1) 1 0))
     (if (= locked 1) (app-disable-output -1) nil)
     (define pin-x (eeprom-read-i ea-pin))
+    ;; persisted PIN-failure state: a pending/active lockout restarts from boot with the
+    ;; persisted duration, so power cycling can never shorten it
+    (define ep-cnt (let ((v (eeprom-read-i ea-fails))) (if (eq v nil) 0 v)))
+    (define ep-series (let ((v (eeprom-read-i ea-series))) (if (eq v nil) 0 v)))
+    (define fail-series ep-series)
+    (define fail-cnt (if (>= ep-cnt max-fails) 0 ep-cnt))
+    (define lock-until (if (and (>= ep-cnt max-fails) (> ep-series 0)) (lockout-dur ep-series) 0.0))
     (define ceil-scale (conf-get 'l-current-max-scale))
     (if (= locked 1) (conf-set 'l-current-max-scale 0.0) nil)
   })
@@ -129,7 +141,16 @@
 (defun pin-enc (p) (bitwise-xor (to-i p) pin-key))
 (defun pin-ok (p) (and (not (eq pin-x nil)) (pin-valid p) (= (pin-enc p) pin-x)))
 
-;; 0 = PIN correct, 7 = wrong, 9 = locked out. Counts failures; lockout 60 s, doubling per series, cap 1 h.
+;; write the persisted failure state only when it changed (flash wear; motor stops briefly)
+(defun persist-fails (c sr)
+  {
+    (if (not (= c ep-cnt)) { (eeprom-store-i ea-fails c) (define ep-cnt c) } nil)
+    (if (not (= sr ep-series)) { (eeprom-store-i ea-series sr) (define ep-series sr) } nil)
+  })
+
+;; 0 = PIN correct, 7 = wrong, 9 = locked out. Counts failures; lockout 60 s, doubling per
+;; series, cap 1 h. Failure count/level persist in EEPROM (written only on a failed attempt
+;; or when a success clears them). Callers refuse while moving (code 3) BEFORE calling this.
 (defun check-pin (p)
   (if (> lock-until uptime)
       9
@@ -137,6 +158,7 @@
           {
             (define fail-cnt 0)
             (define fail-series 0)
+            (persist-fails 0 0)
             0
           }
           {
@@ -145,11 +167,14 @@
                 {
                   (define fail-series (kmin 30 (+ fail-series 1)))
                   (define fail-cnt 0)
-                  (define lock-until (+ uptime (kmin lockout-cap (* lockout-base (pow 2.0 (to-float (- fail-series 1)))))))
+                  (define lock-until (+ uptime (lockout-dur fail-series)))
+                  (persist-fails max-fails fail-series)
                 }
-                nil)
+                (persist-fails fail-cnt fail-series))
             7
           })))
+
+(defun moving () (>= (abs erpm) stop-erpm))
 
 ;; Output is disabled via app-disable-output (stops ADC/PPM/UART apps) and the current
 ;; scale is forced to 0. No set-current / set-brake is ever called: the motor freewheels.
@@ -259,11 +284,11 @@
       (reject 4 4)
       (if (eq pin-x nil)
           (reject 4 8)
-          (let ((r (check-pin (bufget-u32 d 3))))
-            (if (not (= r 0))
-                (reject 4 r)
-                (if (and (not (= locked 1)) (>= (abs erpm) stop-erpm))
-                    (reject 4 3)
+          (if (moving)
+              (reject 4 3)
+              (let ((r (check-pin (bufget-u32 d 3))))
+                (if (not (= r 0))
+                    (reject 4 r)
                     {
                       (if (= locked 1) nil (do-lock))
                       (define last-reject 0)
@@ -275,34 +300,36 @@
       (reject 5 4)
       (if (eq pin-x nil)
           (reject 5 8)
-          (let ((r (check-pin (bufget-u32 d 3))))
-            (if (not (= r 0))
-                (reject 5 r)
-                {
-                  (if (= locked 1) (do-unlock) nil)
-                  (define last-reject 0)
-                  (send-status 5 0)
-                })))))
+          (if (moving)
+              (reject 5 3)
+              (let ((r (check-pin (bufget-u32 d 3))))
+                (if (not (= r 0))
+                    (reject 5 r)
+                    {
+                      (if (= locked 1) (do-unlock) nil)
+                      (define last-reject 0)
+                      (send-status 5 0)
+                    }))))))
 
 (defun handle-set-pin (d)
   (if (< (buflen d) 11)
       (reject 6 4)
       (if (= locked 1)
           (reject 6 11)
-          (let ((r (if (eq pin-x nil) 0 (check-pin (bufget-u32 d 3))))
-                (np (bufget-u32 d 7)))
-            (if (not (= r 0))
-                (reject 6 r)
-                (if (not (pin-valid np))
-                    (reject 6 10)
-                    {
-                      (define pin-x (pin-enc np))
-                      (eeprom-store-i ea-pin pin-x)
-                      (define fail-cnt 0)
-                      (define fail-series 0)
-                      (define last-reject 0)
-                      (send-status 6 0)
-                    }))))))
+          (if (and (not (eq pin-x nil)) (moving))
+              (reject 6 3)
+              (let ((r (if (eq pin-x nil) 0 (check-pin (bufget-u32 d 3))))
+                    (np (bufget-u32 d 7)))
+                (if (not (= r 0))
+                    (reject 6 r)
+                    (if (not (pin-valid np))
+                        (reject 6 10)
+                        {
+                          (define pin-x (pin-enc np))
+                          (eeprom-store-i ea-pin pin-x)
+                          (define last-reject 0)
+                          (send-status 6 0)
+                        })))))))
 
 (defun proc-data (d)
   (if (and (>= (buflen d) 3)

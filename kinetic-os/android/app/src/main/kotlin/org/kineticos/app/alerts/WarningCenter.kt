@@ -77,6 +77,8 @@ class WarningCenter(private val ctx: Context, private val scope: CoroutineScope,
     }
 
     private fun notifyCritical(w: RideWarning) = runCatching {
+        if (Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED) return@runCatching
         if (Build.VERSION.SDK_INT >= 26) ctx.getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel("ride_critical", "Critical ride warnings", NotificationManager.IMPORTANCE_HIGH))
         val pi = PendingIntent.getActivity(ctx, 1, Intent(ctx, MainActivity::class.java).putExtra("screen", "DASH").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)

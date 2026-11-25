@@ -20,7 +20,7 @@ class TcpVescTransport(val host: String, val port: Int = 65102) : VescTransport 
     override suspend fun connect() = withContext(Dispatchers.IO) {
         _state.value = LinkState.Connecting
         val s = Socket(); s.tcpNoDelay = true
-        try { s.connect(InetSocketAddress(host, port), 5000) } catch (e: Exception) { _state.value = LinkState.Failed(e.message ?: "TCP"); throw e }
+        try { s.connect(InetSocketAddress(host, port), 5000) } catch (e: Exception) { runCatching { s.close() }; _state.value = LinkState.Failed(e.message ?: "TCP"); throw e }
         socket = s
         scope.launch {
             val input = s.getInputStream(); val buf = ByteArray(2048)

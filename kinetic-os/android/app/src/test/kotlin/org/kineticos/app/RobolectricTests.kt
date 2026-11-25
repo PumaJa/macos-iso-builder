@@ -57,11 +57,11 @@ class DbAndRecorderTest {
         db.close(); scope.cancel()
     }
 
-    @Test fun firstBackupIsKeptPerController() = runBlocking {
+    @Test fun latestAuthoritativeBackupIsUsedPerController() = runBlocking {
         val db = db()
         db.backups().insert(BackupEntity(vescUuid = "a", takenAt = 1, json = "first"))
         db.backups().insert(BackupEntity(vescUuid = "a", takenAt = 2, json = "second"))
-        assertEquals("first", db.backups().first("a")!!.json); assertNull(db.backups().first("b"))
+        assertEquals("second", db.backups().first("a")!!.json); assertNull(db.backups().first("b"))
         db.close()
     }
 }

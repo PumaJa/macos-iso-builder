@@ -1,4 +1,6 @@
 package org.kineticos.app.ui
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -23,7 +25,8 @@ fun qColor(q: Quality, normal: Color): Color = when (q) {
     Quality.SIMULATED -> K.Sim
     Quality.UNAVAILABLE -> normal.copy(alpha = 0.3f)
 }
-fun qTag(q: Quality) = when (q) { Quality.MEASURED -> "MEAS"; Quality.CALCULATED -> "CALC"; Quality.ESTIMATED -> "EST"; Quality.SIMULATED -> "SIM"; Quality.UNAVAILABLE -> "N/A" }
+@Composable
+fun qTag(q: Quality): String = stringResource(when (q) { Quality.MEASURED -> R.string.q_meas; Quality.CALCULATED -> R.string.q_calc; Quality.ESTIMATED -> R.string.q_est; Quality.SIMULATED -> R.string.q_sim; Quality.UNAVAILABLE -> R.string.q_na })
 fun fmt(q: Q, decimals: Int = 0, scale: Double = 1.0): String = if (!q.isAvailable) "—" else "%.${decimals}f".format(q.value!! * scale)
 
 @Composable
@@ -77,7 +80,7 @@ fun BatteryBar(socPct: Double?, quality: Quality, modifier: Modifier = Modifier)
 @Composable
 fun SimBanner() {
     Box(Modifier.fillMaxWidth().background(K.Sim).padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
-        Text("SIMULATION – NOT REAL VEHICLE DATA", style = labelStyle(11), color = Color.Black, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.sim_banner), style = labelStyle(11), color = Color.Black, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 

@@ -42,7 +42,7 @@ Reply only.
 |---|---|---|
 | 3-6 | PIN | u32, big-endian |
 
-Lock is accepted only if a PIN is set (else code 8), the PIN is correct (7 wrong, 9 locked out) and |ERPM| < stop threshold (else 3). Locking persists a flag in EEPROM, disables app output (`app-disable-output -1`) and forces `l-current-max-scale` to 0. Unlock with the correct PIN clears the flag, re-enables output and restores the mode limits (current scale ramps up). Both are idempotent. Wrong PINs are counted: after 5 consecutive failures every PIN-checked command (4, 5, 6) is refused with code 9 for 60 s; each further failure series doubles it (120 s, 240 s, ... capped at 3600 s). A correct PIN resets the counters. The lockout timer is RAM-only.
+Lock is accepted only if a PIN is set (else code 8), the PIN is correct (7 wrong, 9 locked out) and |ERPM| < stop threshold (else 3). Locking persists a flag in EEPROM, disables app output (`app-disable-output -1`) and forces `l-current-max-scale` to 0. Unlock with the correct PIN clears the flag, re-enables output and restores the mode limits (current scale ramps up). Both are idempotent. Wrong PINs are counted: after 5 consecutive failures every PIN-checked command (4, 5, 6) is refused with code 9 for 60 s; each further failure series doubles it (120 s, 240 s, ... capped at 3600 s). A correct PIN resets the counters. The failure count and lockout level are persisted in EEPROM (written only on a failed attempt or when a success clears them), and a pending lockout restarts at boot with its full persisted duration, so power cycling cannot shorten it or reset the count. PIN-checked commands 4, 5 and 6 are refused with code 3 while |ERPM| >= the stop threshold (no PIN counting, no EEPROM write).
 
 ### cmd 6 - set PIN (length 11)
 | Byte | Field | Type |
@@ -80,7 +80,7 @@ Bytes 0-16 are identical to the earlier 17-byte reply, so old parsers that read 
 |---|---|
 | 0 | OK |
 | 2 | bad mode index |
-| 3 | vehicle moving (|ERPM| >= threshold) and request would increase power |
+| 3 | vehicle moving (|ERPM| >= threshold) and request would increase power; also cmd 4/5/6 while moving |
 | 4 | packet too short |
 | 5 | unknown command |
 | 6 | cmd 2 slot not 3 or 4 |

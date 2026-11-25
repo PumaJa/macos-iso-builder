@@ -5,6 +5,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.kineticos.app.core.*
@@ -36,6 +37,11 @@ class AppGraph(val ctx: Context) {
             b
         },
         findBackup = { uuid -> db.backups().first(uuid)?.let { AppJson.decodeFromString<McConfBackup>(it.json) } },
+        writeLog = object : VehicleConnection.WriteLog {
+            private val prefs = ctx.getSharedPreferences("vesc_writes", 0)
+            override fun lastWrite(uuid: String) = prefs.getLong(uuid, 0L)
+            override fun mark(uuid: String, t: Long) { prefs.edit().putLong(uuid, t).apply() }
+        },
     )
     val recorder = RideRecorder(db, scope)
     val api = Api({ settings.value.serverUrl }, { settings.value.authToken })
@@ -151,22 +157,40 @@ class AppGraph(val ctx: Context) {
     suspend fun deleteProfile(id: String) = db.profiles().delete(id)
 
     /** Apply a ride mode through the SafetyGate. Returns a human readable result. */
-    suspend fun applyProfile(target: RideProfile): String {
+    /** Serialises every controller-changing action (UI, derating loop, lock) so plans are never based on stale state. */
+    private val writeMutex = kotlinx.coroutines.sync.Mutex()
+
+    private fun liveState(): LiveState {
+        val s = connection.sample.value
+        return LiveState(connection.lastValues.value?.erpm, s?.speedMps?.value?.times(3.6), s?.faultCode ?: 0, connection.linkHealthy.value,
+            s?.tempMosC?.value, s?.tempMotorC?.value, s?.socPct?.value)
+    }
+
+    /** Apply a ride mode through the SafetyGate. Returns a human readable result ("Applied …" on success). */
+    suspend fun applyProfile(target: RideProfile, deratingFactor: Double? = null): String = writeMutex.withLock { applyLocked(target, deratingFactor) }
+
+    private suspend fun applyLocked(target: RideProfile, deratingFactor: Double?): String {
         val c = connection.client ?: return "Not connected"
         val v = activeVehicle.value ?: return "Create a vehicle in the garage first"
-        val s = connection.sample.value
-        val live = LiveState(connection.lastValues.value?.erpm, s?.speedMps?.value?.times(3.6), s?.faultCode ?: 0, connection.linkHealthy.value,
-            s?.tempMosC?.value, s?.tempMotorC?.value, s?.socPct?.value)
+        val live = liveState()
         connection.scriptStatus.value?.let { st -> return applyViaScript(c, target, v, live, st) }
-        val (derate, _) = if (target.tempDerate || target.socDerate) Derating.factor(if (target.tempDerate) live.tempMosC else null, if (target.tempDerate) live.tempMotorC else null, if (target.socDerate) live.socPct else null) else (1.0 to emptyList())
+        // The vehicle script was seen in this session but does not answer right now → never fall back to direct writes
+        // (they would overwrite the script's lock/derating limits).
+        if (connection.capabilities.value.script) return "Not applied: vehicle script not responding – try again"
+        val derate = deratingFactor ?: (if (target.tempDerate || target.socDerate) Derating.factor(if (target.tempDerate) live.tempMosC else null,
+            if (target.tempDerate) live.tempMotorC else null, if (target.socDerate) live.socPct else null).first else 1.0)
         return when (val d = gate.planRideMode(connection.capabilities.value.firmware, connection.backup.value, appliedProfile.value, target, v, live, derate)) {
             is GateDecision.Denied -> "Not applied: " + d.reasons.joinToString("; ")
             is GateDecision.Allowed -> try {
                 c.writeAckedChecked(d.payload, d.token)
-                _appliedProfile.value = target
+                connection.markWrite()
+                _appliedProfile.value = d.effective ?: target
                 settingsRepo.update { it.copy(activeProfileId = target.id) }
                 "Applied " + d.summary + (if (d.warnings.isNotEmpty()) "\n" + d.warnings.joinToString("\n") else "")
-            } catch (e: Exception) { "Write failed – controller keeps previous limits (${e.message})" }
+            } catch (e: Exception) {
+                _appliedProfile.value = null // unknown outcome → assume the most powerful state for the next decision
+                "Write failed – controller state unknown, treated as stock (${e.message})"
+            }
         }
     }
 
@@ -177,49 +201,62 @@ class AppGraph(val ctx: Context) {
             is ScriptDecision.Plan -> try {
                 val p = d.plan
                 val r1 = OnVehicleScript.parseStatus(c.writeAckedChecked(p.setParams, p.tokens.first))
-                if (r1 == null || r1.result != 0) "Vehicle script refused parameters: ${r1?.resultText ?: "no reply"}"
+                if (r1 == null || r1.echoedCommand != 2 || r1.result != 0) "Vehicle script refused parameters: ${r1?.takeIf { it.echoedCommand == 2 }?.resultText ?: "no matching reply"}"
                 else {
                     val r2 = OnVehicleScript.parseStatus(c.writeAckedChecked(p.select, p.tokens.second))
-                    r2?.let { connection.updateScript(it) }
-                    if (r2 == null || r2.result != 0) "Vehicle script refused mode: ${r2?.resultText ?: "no reply"}"
-                    else {
-                        _appliedProfile.value = target
+                    if (r2 != null && r2.echoedCommand == 1) connection.updateScript(r2)
+                    if (r2 == null || r2.echoedCommand != 1 || r2.result != 0 || r2.mode != p.slot) {
+                        _appliedProfile.value = null
+                        "Vehicle script refused mode: ${r2?.takeIf { it.echoedCommand == 1 }?.resultText ?: "no matching reply"}"
+                    } else {
+                        _appliedProfile.value = p.effective ?: target
                         settingsRepo.update { it.copy(activeProfileId = target.id) }
                         "Applied " + p.summary + (if (p.warnings.isNotEmpty()) "\n" + p.warnings.joinToString("\n") else "")
                     }
                 }
-            } catch (e: Exception) { "Write failed – vehicle keeps previous mode (${e.message})" }
+            } catch (e: Exception) { _appliedProfile.value = null; "Write failed – vehicle mode unknown, treated as stock (${e.message})" }
         }
 
     // ---------- anti-theft lock (lives on the VESC script; the phone only sends PIN-protected commands) ----------
-    suspend fun lockAction(action: String, pin: String, newPin: String? = null): String {
-        val c = connection.client ?: return "Not connected"
-        val s = connection.sample.value
-        val live = LiveState(connection.lastValues.value?.erpm, s?.speedMps?.value?.times(3.6), s?.faultCode ?: 0, connection.linkHealthy.value, null, null, null)
-        return when (val d = gate.planLock(action, pin, newPin, connection.scriptStatus.value, live)) {
+    suspend fun lockAction(action: String, pin: String, newPin: String? = null): String = writeMutex.withLock {
+        val c = connection.client ?: return@withLock "Not connected"
+        when (val d = gate.planLock(action, pin, newPin, connection.scriptStatus.value, liveState())) {
             is LockDecision.Denied -> d.reason
             is LockDecision.Allowed -> try {
-                val st = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token)) ?: return "No reply from vehicle script"
-                connection.updateScript(st)
-                if (st.result != 0) "Refused by vehicle: ${st.resultText}"
-                else when (action) { "lock" -> "Vehicle LOCKED"; "unlock" -> "Vehicle unlocked"; else -> "PIN saved on the vehicle" }
+                val cmd = when (action) { "lock" -> 4; "unlock" -> 5; else -> 6 }
+                val st = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token))
+                // Only trust a reply that answers *this* command and shows the expected state.
+                val fresh = if (st == null || st.echoedCommand != cmd) connection.refreshScript() else st
+                if (fresh != null) connection.updateScript(fresh)
+                val lock = fresh?.lock
+                when {
+                    fresh == null || lock == null -> "No confirmation from vehicle – check lock state before leaving"
+                    fresh.echoedCommand == cmd && fresh.result != 0 -> "Refused by vehicle: ${fresh.resultText}"
+                    action == "lock" && lock.locked -> "Vehicle LOCKED"
+                    action == "unlock" && !lock.locked -> "Vehicle unlocked"
+                    action == "setpin" && lock.pinSet && fresh.echoedCommand == cmd && fresh.result == 0 -> "PIN saved on the vehicle"
+                    else -> "Vehicle state does not confirm the action – check lock state"
+                }
             } catch (e: Exception) { "No confirmation from vehicle (${e.message}) – check lock state before leaving" }
         }
     }
 
-    suspend fun restoreStock(): String {
-        val c = connection.client ?: return "Not connected"
-        val b = connection.backup.value ?: return "No backup available"
+    suspend fun restoreStock(): String = writeMutex.withLock {
+        val c = connection.client ?: return@withLock "Not connected"
+        val b = connection.backup.value ?: return@withLock "No backup available"
+        val v = activeVehicle.value
         connection.scriptStatus.value?.let { st ->
-            val v = activeVehicle.value ?: return "Create a vehicle first"
-            // full fractions = the script's boot ceiling = stored limits; reductions are always allowed by the gate
-            val r = applyViaScript(c, SafetyGate.STOCK, v, LiveState(null, 0.0, 0, connection.linkHealthy.value, null, null, null), st)
+            if (v == null) return@withLock "Create a vehicle first"
+            // full fractions = the script's boot ceiling = stored limits; the gate requires standstill for this increase
+            val r = applyViaScript(c, SafetyGate.STOCK, v, liveState(), st)
             if (r.startsWith("Applied")) _appliedProfile.value = null
-            return r
+            return@withLock r
         }
-        return when (val d = gate.planRestore(b, LiveState(null, null, 0, connection.linkHealthy.value, null, null, null))) {
-            is GateDecision.Denied -> d.reasons.joinToString()
-            is GateDecision.Allowed -> runCatching { c.writeAckedChecked(d.payload, d.token); _appliedProfile.value = null; "Stored limits restored" }.getOrElse { "Restore failed: ${it.message}" }
+        if (connection.capabilities.value.script) return@withLock "Not applied: vehicle script not responding – try again"
+        when (val d = gate.planRestore(b, liveState(), v)) {
+            is GateDecision.Denied -> "Not applied: " + d.reasons.joinToString()
+            is GateDecision.Allowed -> runCatching { c.writeAckedChecked(d.payload, d.token); connection.markWrite(); _appliedProfile.value = null; "Stored limits restored" }
+                .getOrElse { _appliedProfile.value = null; "Restore failed: ${it.message}" }
         }
     }
 
@@ -228,21 +265,22 @@ class AppGraph(val ctx: Context) {
         while (true) {
             delay(2000)
             val p = appliedProfile.value ?: continue
-            if (connection.scriptStatus.value != null) continue // the on-vehicle script derates locally
+            if (connection.capabilities.value.script) continue // the on-vehicle script derates locally
             val s = connection.sample.value ?: continue
             val (f, why) = Derating.factor(if (p.tempDerate) s.tempMosC.value else null, if (p.tempDerate) s.tempMotorC.value else null, if (p.socDerate) s.socPct.value else null)
-            val stationary = (s.speedMps.value ?: 0.0) * 3.6 < 2.0
+            val speed = s.speedMps.value?.times(3.6)
+            val stationary = speed != null && speed < 2.0 // unknown speed counts as moving
             if (f < lastFactor - 0.05 || (f > lastFactor + 0.1 && stationary)) {
-                // Reductions are always allowed; recovery only at standstill (gate enforces).
-                val r = applyProfile(p)
-                if (!r.startsWith("Not applied")) { lastFactor = f; if (why.isNotEmpty()) toast("Power reduced: ${why.joinToString()}") }
+                // Recovery (higher factor) only at standstill; the factor is passed explicitly so the gate sees the real target.
+                val r = applyProfile(p, deratingFactor = f)
+                if (r.startsWith("Applied")) { lastFactor = f; if (why.isNotEmpty()) toast("Power reduced: ${why.joinToString()}") }
             }
         }
     }
 
-    // ---------- telematics ----------
+    // ---------- telematics (queue per vehicle, so states never end up on the wrong vehicle) ----------
     private suspend fun telematicsLoop() {
-        val pending = ArrayList<VehicleState>()
+        val pending = HashMap<String, ArrayList<VehicleState>>()
         while (true) {
             val s = settings.value
             delay(if (s.powerSaver) 30_000 else 5_000)
@@ -250,10 +288,11 @@ class AppGraph(val ctx: Context) {
             if (!s.telematicsEnabled || s.authToken == null) continue
             val online = connection.status.value is ConnStatus.Online
             val sample = connection.sample.value
-            pending += TelematicsMapper.toState(if (online) sample else null, online && connection.linkHealthy.value,
+            val q = pending.getOrPut(v.id) { ArrayList() }
+            q += TelematicsMapper.toState(if (online) sample else null, online && connection.linkHealthy.value,
                 sample?.odometerKm?.value, connection.isSimulated, gps.fix.value, connection.scriptStatus.value?.lock)
-            if (pending.size > 500) pending.subList(0, pending.size - 500).clear()
-            runCatching { api.pushStates(v.id, pending.toList()); pending.clear() }   // offline → kept and retried
+            if (q.size > 500) q.subList(0, q.size - 500).clear()
+            for ((vid, list) in pending) if (list.isNotEmpty()) runCatching { api.pushStates(vid, list.toList()); list.clear() } // offline → kept and retried
         }
     }
 

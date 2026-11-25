@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +34,9 @@ fun RemoteScreen() {
     var radius by remember { mutableStateOf("300") }
     var lowBatt by remember { mutableStateOf("20") }
     val scope = rememberCoroutineScope()
+    val savedText = stringResource(R.string.remote_saved)
+    val noPositionText = stringResource(R.string.remote_no_position)
+    val fenceAddedText = stringResource(R.string.remote_fence_added)
     LaunchedEffect(vid, settings.authToken) {
         if (vid.isBlank() || settings.authToken == null) return@LaunchedEffect
         while (true) {
@@ -40,42 +45,42 @@ fun RemoteScreen() {
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        SectionTitle("Telematics / remote monitoring")
-        Toggle("Upload this cockpit's state to the server", settings.telematicsEnabled, { v -> scope.launch { g.settingsRepo.update { it.copy(telematicsEnabled = v) } } }, "Every 5 s while running (30 s in power-saver). Simulated data is flagged.")
-        Toggle("Alert notifications on this phone", settings.alertNotifications, { v -> scope.launch { g.settingsRepo.update { it.copy(alertNotifications = v) } } }, "Live via server connection; in background checked every 15 min (Android minimum)")
-        if (settings.authToken == null) { Text("Log in under Settings → Account first.", color = K.Warn); return@Column }
+        SectionTitle(stringResource(R.string.remote_section))
+        Toggle(stringResource(R.string.remote_upload), settings.telematicsEnabled, { v -> scope.launch { g.settingsRepo.update { it.copy(telematicsEnabled = v) } } }, stringResource(R.string.remote_upload_sub))
+        Toggle(stringResource(R.string.remote_notif), settings.alertNotifications, { v -> scope.launch { g.settingsRepo.update { it.copy(alertNotifications = v) } } }, stringResource(R.string.remote_notif_sub))
+        if (settings.authToken == null) { Text(stringResource(R.string.remote_login_first), color = K.Warn); return@Column }
         Row { vehicles.forEach { v -> BigButton(v.name, Modifier.padding(end = 4.dp), selected = v.id == vid) { vid = v.id } } }
-        Field("…or vehicle id", vid, { vid = it }, Modifier.fillMaxWidth())
-        err?.let { Text("Server: $it", color = K.Danger) }
+        Field(stringResource(R.string.remote_vehicle_id), vid, { vid = it }, Modifier.fillMaxWidth())
+        err?.let { Text(stringResource(R.string.remote_server_err, it), color = K.Danger) }
         remote?.let { r ->
             val st = r.state
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                if (r.online) Pill("LIVE", K.Regen) else Pill("OFFLINE – last known state", K.Warn)
-                if (st?.source == "simulated") Pill("SIMULATION", K.Sim, Modifier.padding(top = 4.dp))
-                Text("Last update: ${r.receivedAt?.let { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault()).format(Date(it)) } ?: "never"}", color = p.text)
+                if (r.online) Pill(stringResource(R.string.remote_live), K.Regen) else Pill(stringResource(R.string.remote_offline), K.Warn)
+                if (st?.source == "simulated") Pill(stringResource(R.string.sim_short), K.Sim, Modifier.padding(top = 4.dp))
+                Text(stringResource(R.string.remote_last_update, r.receivedAt?.let { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault()).format(Date(it)) } ?: stringResource(R.string.remote_never)), color = p.text)
                 st?.let { s ->
-                    Text("Position: ${s.lat?.let { "%.5f, %.5f".format(it, s.lon) } ?: "unknown"}", color = p.text)
-                    Text("Speed ${s.speedKmh?.let { "%.0f km/h".format(it) } ?: "—"} · SoC ${s.socPct?.let { "%.0f%%".format(it) } ?: "—"} · ${s.voltage?.let { "%.1f V".format(it) } ?: "—"}${if (s.charging == true) " · charging" else ""}", color = p.text)
-                    Text("FET ${s.tempMosC?.let { "%.0f°C".format(it) } ?: "—"} · Motor ${s.tempMotorC?.let { "%.0f°C".format(it) } ?: "—"} · VESC ${if (s.vescConnected) "connected" else "not connected"} · Fault ${s.faultCode ?: 0}", color = p.textDim)
+                    Text(stringResource(R.string.remote_position, s.lat?.let { "%.5f, %.5f".format(it, s.lon) } ?: stringResource(R.string.remote_unknown)), color = p.text)
+                    Text(stringResource(R.string.remote_speed_line, s.speedKmh?.let { "%.0f km/h".format(it) } ?: "—", s.socPct?.let { "%.0f%%".format(it) } ?: "—", s.voltage?.let { "%.1f V".format(it) } ?: "—", if (s.charging == true) stringResource(R.string.remote_charging) else ""), color = p.text)
+                    Text(stringResource(R.string.remote_temp_line, s.tempMosC?.let { "%.0f°C".format(it) } ?: "—", s.tempMotorC?.let { "%.0f°C".format(it) } ?: "—", stringResource(if (s.vescConnected) R.string.remote_vesc_connected else R.string.remote_vesc_not_connected), s.faultCode ?: 0), color = p.textDim)
                 }
             }
         }
-        SectionTitle("Alert settings")
+        SectionTitle(stringResource(R.string.remote_alert_settings))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("Low battery %", lowBatt, { lowBatt = it }, Modifier.weight(1f), true)
-            BigButton("SAVE") { scope.launch { runCatching { g.api.telematicsSettings(vid, lowBatt.toIntOrNull() ?: 20, 0, true) }.onSuccess { g.toast("Saved") }.onFailure { g.toast(it.message ?: "") } } }
+            Field(stringResource(R.string.remote_low_batt), lowBatt, { lowBatt = it }, Modifier.weight(1f), true)
+            BigButton(stringResource(R.string.remote_save)) { scope.launch { runCatching { g.api.telematicsSettings(vid, lowBatt.toIntOrNull() ?: 20, 0, true) }.onSuccess { g.toast(savedText) }.onFailure { g.toast(it.message ?: "") } } }
         }
-        SectionTitle("Geofences (theft / movement alerts)")
-        fences.forEach { f -> Row(verticalAlignment = Alignment.CenterVertically) { Text("${f.name}: %.0f m (%s)".format(f.radiusM, f.alertOn), color = p.text, modifier = Modifier.weight(1f)); BigButton("✕", color = K.Danger) { scope.launch { runCatching { g.api.deleteGeofence(vid, f.id) } } } } }
+        SectionTitle(stringResource(R.string.remote_geofences))
+        fences.forEach { f -> Row(verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.remote_fence_row, f.name, f.radiusM, f.alertOn), color = p.text, modifier = Modifier.weight(1f)); BigButton("✕", color = K.Danger) { scope.launch { runCatching { g.api.deleteGeofence(vid, f.id) } } } } }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("Radius m", radius, { radius = it }, Modifier.weight(1f), true)
-            BigButton("FENCE AT CURRENT POSITION") {
+            Field(stringResource(R.string.remote_radius), radius, { radius = it }, Modifier.weight(1f), true)
+            BigButton(stringResource(R.string.remote_fence_here)) {
                 val f = g.gps.fix.value ?: remote?.state?.let { s -> if (s.lat != null && s.lon != null) org.kineticos.telemetry.GpsFix(s.lat, s.lon, null, null, null, null, 0) else null }
-                if (f == null) g.toast("No position") else scope.launch { runCatching { g.api.addGeofence(vid, "Home", f.lat, f.lon, radius.toD() ?: 300.0, "exit") }.onSuccess { g.toast("Geofence added") }.onFailure { g.toast(it.message ?: "") } }
+                if (f == null) g.toast(noPositionText) else scope.launch { runCatching { g.api.addGeofence(vid, "Home", f.lat, f.lon, radius.toD() ?: 300.0, "exit") }.onSuccess { g.toast(fenceAddedText) }.onFailure { g.toast(it.message ?: "") } }
             }
         }
-        SectionTitle("Alerts")
+        SectionTitle(stringResource(R.string.remote_alerts))
         alerts.take(30).forEach { a -> Text("${SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(Date(a.ts))}  ${a.kind}: ${a.message}", color = if (a.kind.contains("geofence") || a.kind == "movement") K.Danger else p.text) }
-        Text("Web dashboard: ${settings.serverUrl.ifBlank { "<server>" }}/", color = p.textDim, modifier = Modifier.padding(top = 10.dp))
+        Text(stringResource(R.string.remote_web, settings.serverUrl.ifBlank { stringResource(R.string.remote_server_placeholder) }), color = p.textDim, modifier = Modifier.padding(top = 10.dp))
     }
 }

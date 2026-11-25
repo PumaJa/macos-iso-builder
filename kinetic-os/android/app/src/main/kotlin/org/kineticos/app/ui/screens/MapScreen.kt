@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -72,17 +74,17 @@ fun MapScreen() {
     var lastReroute by remember { mutableLongStateOf(0L) }
     val turnGuidance = remember(fix, turn) { fix?.let { f -> turn?.update(f.lat, f.lon) } }
     suspend fun requestRoute(to: RoutePoint) {
-        val f = fix ?: run { g.toast("No GPS fix"); return }
+        val f = fix ?: run { g.toast(ctx.getString(R.string.grp_no_fix)); return }
         runCatching { org.kineticos.app.nav.OsrmParser.parse(g.api.route(listOf(f.lat to f.lon, to.lat to to.lon))) }
             .onSuccess { r -> turn = org.kineticos.app.nav.TurnByTurn(r); activeRoute = r.points; destination = to
                 info = "%.1f km · %.0f min".format(r.distanceM / 1000, r.durationS / 60) + r.warnings.joinToString("") { "\n⚠ $it" } }
-            .onFailure { e -> g.toast(when (e) { is org.kineticos.app.net.ApiException -> if (e.code == 503) "Road routing not set up on the server (see server/README → routing)" else e.message ?: "routing failed"; else -> e.message ?: "routing failed" }) }
+            .onFailure { e -> g.toast(when (e) { is org.kineticos.app.net.ApiException -> if (e.code == 503) ctx.getString(R.string.map_routing_503) else e.message ?: ctx.getString(R.string.map_routing_failed); else -> e.message ?: ctx.getString(R.string.map_routing_failed) }) }
     }
     // automatic re-routing when off route (at most every 20 s)
     LaunchedEffect(turnGuidance?.offRoute) {
         val d = destination
         if (turnGuidance?.offRoute == true && d != null && System.currentTimeMillis() - lastReroute > 20_000) { lastReroute = System.currentTimeMillis(); requestRoute(d) }
-        if (turnGuidance?.arrived == true) { g.toast("Destination reached"); turn = null; destination = null }
+        if (turnGuidance?.arrived == true) { g.toast(ctx.getString(R.string.map_arrived)); turn = null; destination = null }
     }
     val night = p.night
     val trail = remember { mutableStateListOf<RoutePoint>() }
@@ -97,8 +99,8 @@ fun MapScreen() {
                 val pts = (gpx.tracks.flatten() + gpx.routes.flatten()).map { RoutePoint(it.lat, it.lon, it.ele) }
                 gpx.waypoints.forEach { g.db.nav().addWaypoint(WaypointEntity(name = it.name ?: "WPT", lat = it.lat, lon = it.lon, ele = it.ele)) }
                 if (pts.size >= 2) { g.db.nav().upsertRoute(RouteEntity(UUID.randomUUID().toString(), uri.lastPathSegment ?: "Route", text, System.currentTimeMillis())); activeRoute = pts }
-                "Imported ${pts.size} points, ${gpx.waypoints.size} waypoints"
-            }.onSuccess { g.toast(it) }.onFailure { g.toast("GPX import failed: ${it.message}") }
+                ctx.getString(R.string.map_imported, pts.size, gpx.waypoints.size)
+            }.onSuccess { g.toast(it) }.onFailure { g.toast(ctx.getString(R.string.map_gpx_failed, it.message)) }
         }
     }
 
@@ -115,7 +117,7 @@ fun MapScreen() {
     LaunchedEffect(mapView, night) {
         mapView.getMapAsync { m ->
             map = m
-            mapView.addOnDidFailLoadingMapListener { err -> info = "Map unavailable: $err (offline areas still work)" }
+            mapView.addOnDidFailLoadingMapListener { err -> info = ctx.getString(R.string.map_unavailable, err.toString()) }
             m.uiSettings.isCompassEnabled = true; m.uiSettings.isAttributionEnabled = true; m.uiSettings.isLogoEnabled = false
             m.setStyle(Style.Builder().fromUri(if (night) settings.mapStyleNight else settings.mapStyleDay)) { st ->
                 fun src(id: String) = st.addSource(GeoJsonSource(id))
@@ -164,58 +166,58 @@ fun MapScreen() {
         Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
             turnGuidance?.let { tg ->
                 Card {
-                    Text(if (tg.offRoute) "OFF ROUTE – recalculating" else "%s  ·  %s".format(if (tg.distanceToTurnM < 1000) "%.0f m".format(tg.distanceToTurnM) else "%.1f km".format(tg.distanceToTurnM / 1000), tg.next.instruction),
+                    Text(if (tg.offRoute) stringResource(R.string.map_off_route_recalc) else "%s  ·  %s".format(if (tg.distanceToTurnM < 1000) "%.0f m".format(tg.distanceToTurnM) else "%.1f km".format(tg.distanceToTurnM / 1000), tg.next.instruction),
                         style = labelStyle(16), color = if (tg.offRoute) K.Danger else K.Accent)
-                    tg.then?.let { Text("then: ${it.instruction}", style = labelStyle(11), color = p.textDim) }
-                    Text("Remaining %.1f km".format(tg.remainingM / 1000), style = labelStyle(11), color = p.textDim)
+                    tg.then?.let { Text(stringResource(R.string.map_then, it.instruction), style = labelStyle(11), color = p.textDim) }
+                    Text(stringResource(R.string.map_remaining, tg.remainingM / 1000), style = labelStyle(11), color = p.textDim)
                 }
             }
             if (turnGuidance == null) guidance?.let { gd ->
                 Card {
-                    Text(if (gd.offRoute) "OFF ROUTE  %.0f m".format(gd.distanceToRouteM) else "NEXT %.0f m · %03.0f°".format(gd.distanceToNextM, gd.bearingToNextDeg), style = labelStyle(14), color = if (gd.offRoute) K.Danger else K.Accent)
-                    Text("Remaining %.1f km · %.0f%%".format(gd.remainingM / 1000, gd.progressFrac * 100), style = labelStyle(11), color = p.textDim)
+                    Text(if (gd.offRoute) stringResource(R.string.map_off_route, gd.distanceToRouteM) else stringResource(R.string.map_next, gd.distanceToNextM, gd.bearingToNextDeg), style = labelStyle(14), color = if (gd.offRoute) K.Danger else K.Accent)
+                    Text(stringResource(R.string.map_remaining_progress, gd.remainingM / 1000, gd.progressFrac * 100), style = labelStyle(11), color = p.textDim)
                 }
             }
             info?.let { Card(Modifier.padding(top = 6.dp)) { Text(it, style = labelStyle(13), color = p.text) } }
             activeRoute?.let { r -> RouteGuide(r).elevationProfile().takeIf { it.size > 2 }?.let { prof ->
-                Card(Modifier.padding(top = 6.dp).width(220.dp).height(90.dp)) { Text("ELEVATION", style = labelStyle(9), color = p.textDim); LineChart(listOf(K.Warn to prof.map { it.second.toFloat() }), Modifier.fillMaxSize()) }
+                Card(Modifier.padding(top = 6.dp).width(220.dp).height(90.dp)) { Text(stringResource(R.string.map_elevation), style = labelStyle(9), color = p.textDim); LineChart(listOf(K.Warn to prof.map { it.second.toFloat() }), Modifier.fillMaxSize()) }
             } }
         }
         Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(p.bg.copy(alpha = 0.7f)).horizontalScroll(rememberScrollState()).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            BigButton(if (follow) "FOLLOW ✓" else "FOLLOW", selected = follow) { follow = !follow }
-            BigButton(if (headingUp) "HEADING UP" else "NORTH UP", selected = headingUp) { headingUp = !headingUp }
-            BigButton(if (turn != null) "STOP NAV" else "NAVIGATE TO…", selected = tool == MapTool.NAVIGATE || turn != null) {
+            BigButton(stringResource(if (follow) R.string.map_follow_on else R.string.map_follow), selected = follow) { follow = !follow }
+            BigButton(stringResource(if (headingUp) R.string.map_heading_up else R.string.map_north_up), selected = headingUp) { headingUp = !headingUp }
+            BigButton(stringResource(if (turn != null) R.string.map_stop_nav else R.string.map_navigate), selected = tool == MapTool.NAVIGATE || turn != null) {
                 if (turn != null) { turn = null; destination = null; activeRoute = null; info = null }
-                else { tool = MapTool.NAVIGATE; g.toast("Tap the destination on the map") }
+                else { tool = MapTool.NAVIGATE; g.toast(ctx.getString(R.string.map_tap_dest)) }
             }
-            BigButton("GPX IMPORT") { gpxPicker.launch("*/*") }
-            BigButton("WAYPOINT", selected = tool == MapTool.WAYPOINT) { tool = if (tool == MapTool.WAYPOINT) MapTool.NONE else MapTool.WAYPOINT }
-            BigButton("MEASURE", selected = tool == MapTool.MEASURE) { if (tool == MapTool.MEASURE) { tool = MapTool.NONE; plan.clear(); info = null } else { plan.clear(); tool = MapTool.MEASURE } }
-            BigButton("PLAN ROUTE", selected = tool == MapTool.PLAN) {
+            BigButton(stringResource(R.string.map_gpx_import)) { gpxPicker.launch("*/*") }
+            BigButton(stringResource(R.string.map_waypoint), selected = tool == MapTool.WAYPOINT) { tool = if (tool == MapTool.WAYPOINT) MapTool.NONE else MapTool.WAYPOINT }
+            BigButton(stringResource(R.string.map_measure), selected = tool == MapTool.MEASURE) { if (tool == MapTool.MEASURE) { tool = MapTool.NONE; plan.clear(); info = null } else { plan.clear(); tool = MapTool.MEASURE } }
+            BigButton(stringResource(R.string.map_plan), selected = tool == MapTool.PLAN) {
                 if (tool == MapTool.PLAN) { tool = MapTool.NONE; if (plan.size >= 2) { activeRoute = plan.toList(); scope.launch {
                     val gpx = org.kineticos.app.nav.Gpx.fromPoints("Planned route", plan.toList())
-                    g.db.nav().upsertRoute(RouteEntity(UUID.randomUUID().toString(), "Planned ${java.text.SimpleDateFormat("dd.MM HH:mm").format(java.util.Date())}", gpx, System.currentTimeMillis()))
-                    g.toast("Route saved") } }; plan.clear(); info = null }
+                    g.db.nav().upsertRoute(RouteEntity(UUID.randomUUID().toString(), ctx.getString(R.string.map_planned, java.text.SimpleDateFormat("dd.MM HH:mm").format(java.util.Date())), gpx, System.currentTimeMillis()))
+                    g.toast(ctx.getString(R.string.map_route_saved)) } }; plan.clear(); info = null }
                 else { plan.clear(); tool = MapTool.PLAN }
             }
-            if (activeRoute != null && turn == null) BigButton("END ROUTE", color = K.Danger) { activeRoute = null }
+            if (activeRoute != null && turn == null) BigButton(stringResource(R.string.map_end_route), color = K.Danger) { activeRoute = null }
             routes.take(5).forEach { r -> BigButton(r.name.take(14)) {
                 runCatching { GpxImporter.parse(r.gpx) }.getOrNull()?.let { gd -> activeRoute = (gd.tracks.flatten() + gd.routes.flatten()).map { RoutePoint(it.lat, it.lon, it.ele) } }
             } }
-            BigButton("OFFLINE AREA") {
+            BigButton(stringResource(R.string.map_offline_area)) {
                 val m = map ?: return@BigButton
                 val b: LatLngBounds = m.projection.visibleRegion.latLngBounds
                 val def = OfflineTilePyramidRegionDefinition(if (night) settings.mapStyleNight else settings.mapStyleDay, b, m.cameraPosition.zoom.coerceAtMost(12.0), 16.0, ctx.resources.displayMetrics.density)
                 OfflineManager.getInstance(ctx).createOfflineRegion(def, "area".toByteArray(), object : OfflineManager.CreateOfflineRegionCallback {
                     override fun onCreate(offlineRegion: OfflineRegion) {
                         offlineRegion.setObserver(object : OfflineRegion.OfflineRegionObserver {
-                            override fun onStatusChanged(status: OfflineRegionStatus) { if (status.isComplete) { g.toast("Offline area ready (${status.completedResourceCount} tiles)"); offlineRegion.setDownloadState(OfflineRegion.STATE_INACTIVE) } }
-                            override fun onError(error: OfflineRegionError) { g.toast("Offline download: ${error.message}") }
-                            override fun mapboxTileCountLimitExceeded(limit: Long) { g.toast("Area too large (tile limit $limit)") }
+                            override fun onStatusChanged(status: OfflineRegionStatus) { if (status.isComplete) { g.toast(ctx.getString(R.string.map_offline_ready, status.completedResourceCount)); offlineRegion.setDownloadState(OfflineRegion.STATE_INACTIVE) } }
+                            override fun onError(error: OfflineRegionError) { g.toast(ctx.getString(R.string.map_offline_dl_err, error.message)) }
+                            override fun mapboxTileCountLimitExceeded(limit: Long) { g.toast(ctx.getString(R.string.map_too_large, limit)) }
                         })
-                        offlineRegion.setDownloadState(OfflineRegion.STATE_ACTIVE); g.toast("Downloading visible area…")
+                        offlineRegion.setDownloadState(OfflineRegion.STATE_ACTIVE); g.toast(ctx.getString(R.string.map_downloading))
                     }
-                    override fun onError(error: String) { g.toast("Offline: $error") }
+                    override fun onError(error: String) { g.toast(ctx.getString(R.string.map_offline_err, error)) }
                 })
             }
         }

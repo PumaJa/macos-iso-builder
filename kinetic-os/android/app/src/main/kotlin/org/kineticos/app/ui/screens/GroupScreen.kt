@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import android.Manifest
 import android.content.Intent
@@ -57,11 +59,11 @@ fun GroupScreen(activity: MainActivity) {
 
     suspend fun refresh() = runCatching {
         groups = g.api.groups(); publicGroups = g.api.publicGroups(); friends = g.api.friends(); requests = g.api.friendRequests(); invitations = g.api.invitations()
-    }.onFailure { g.toast("Server: ${it.message}") }
+    }.onFailure { g.toast(ctx.getString(R.string.grp_server_err, it.message)) }
     fun enter(gr: Group) { active = gr; g.socket.joinGroup(gr.id); chat.clear() }
 
     LaunchedEffect(settings.authToken) { if (settings.authToken != null) refresh() }
-    LaunchedEffect(Unit) { activity.deepLinkJoin.collect { c -> code = c; if (settings.authToken != null) runCatching { enter(g.api.joinGroup(c)) }.onFailure { g.toast(it.message ?: "join failed") } } }
+    LaunchedEffect(Unit) { activity.deepLinkJoin.collect { c -> code = c; if (settings.authToken != null) runCatching { enter(g.api.joinGroup(c)) }.onFailure { g.toast(it.message ?: ctx.getString(R.string.grp_join_failed)) } } }
     LaunchedEffect(active?.id) {
         val gid = active?.id ?: return@LaunchedEffect
         g.socket.messages.collect { o ->
@@ -69,53 +71,53 @@ fun GroupScreen(activity: MainActivity) {
             val from = o["displayName"]?.jsonPrimitive?.contentOrNull ?: "?"
             when (o["type"]?.jsonPrimitive?.contentOrNull) {
                 "chat" -> chat += ChatLine(from, o["text"]?.jsonPrimitive?.content ?: "", System.currentTimeMillis())
-                "help_request" -> { chat += ChatLine(from, "🆘 HELP: " + (o["message"]?.jsonPrimitive?.content ?: "") + " @ %.5f, %.5f".format(o["lat"]?.jsonPrimitive?.double, o["lon"]?.jsonPrimitive?.double), System.currentTimeMillis(), help = true); g.toast("Help request from $from") }
+                "help_request" -> { chat += ChatLine(from, ctx.getString(R.string.grp_help_msg, o["message"]?.jsonPrimitive?.content ?: "", "%.5f, %.5f".format(o["lat"]?.jsonPrimitive?.double, o["lon"]?.jsonPrimitive?.double)), System.currentTimeMillis(), help = true); g.toast(ctx.getString(R.string.grp_help_toast, from)) }
                 "voice" -> runCatching {
                     val f = File(ctx.cacheDir, "voice-${System.nanoTime()}.m4a"); f.writeBytes(Base64.decode(o["dataBase64"]!!.jsonPrimitive.content, Base64.DEFAULT))
-                    chat += ChatLine(from, "🎤 voice %.0fs".format((o["durationMs"]?.jsonPrimitive?.long ?: 0) / 1000.0), System.currentTimeMillis(), f)
+                    chat += ChatLine(from, ctx.getString(R.string.grp_voice, (o["durationMs"]?.jsonPrimitive?.long ?: 0) / 1000.0), System.currentTimeMillis(), f)
                     MediaPlayer().apply { setDataSource(f.absolutePath); prepare(); start(); setOnCompletionListener { release() } }
                 }
-                "route_updated" -> g.toast("Group route updated")
+                "route_updated" -> g.toast(ctx.getString(R.string.grp_route_updated))
             }
             if (chat.size > 200) chat.removeAt(0)
         }
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        SectionTitle("Group ride")
+        SectionTitle(stringResource(R.string.grp_title))
         StarkCompatCard()
         if (settings.serverUrl.isBlank() || settings.authToken == null) {
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text("Kinetic group rides use your own self-hosted server (see server/README.md). Set the server and log in under Settings → Account.", color = p.textDim)
+                Text(stringResource(R.string.grp_server_needed), color = p.textDim)
             }
             return@Column
         }
-        Text("Server link: " + when (val s = sockState) { SocketState.Open -> "online"; SocketState.Connecting -> "connecting"; is SocketState.Retry -> "retry in ${s.inMs / 1000}s (${s.reason})"; SocketState.Off -> "off" }, color = if (sockState == SocketState.Open) K.Regen else K.Warn)
-        Toggle("Share live telemetry (SoC, power) with group", settings.shareTelemetryInGroups, { v -> scope.launch { g.settingsRepo.update { it.copy(shareTelemetryInGroups = v) } } }, "Position is shared while you are in a group; telemetry only with this consent")
+        Text(stringResource(R.string.grp_link, when (val s = sockState) { SocketState.Open -> stringResource(R.string.grp_link_online); SocketState.Connecting -> stringResource(R.string.grp_link_connecting); is SocketState.Retry -> stringResource(R.string.grp_link_retry, s.inMs / 1000, s.reason); SocketState.Off -> stringResource(R.string.grp_link_off) }), color = if (sockState == SocketState.Open) K.Regen else K.Warn)
+        Toggle(stringResource(R.string.grp_share_tel), settings.shareTelemetryInGroups, { v -> scope.launch { g.settingsRepo.update { it.copy(shareTelemetryInGroups = v) } } }, stringResource(R.string.grp_share_tel_sub))
 
         active?.let { gr ->
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) { Text(gr.name, style = labelStyle(16), color = K.Accent); Text("Code ${gr.code} · ${gr.visibility}", color = p.textDim) }
-                    BigButton("SHARE") { ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Join my ride: kineticos://join/${gr.code} (code ${gr.code})"), "Invite").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    Column(Modifier.weight(1f)) { Text(gr.name, style = labelStyle(16), color = K.Accent); Text(stringResource(R.string.grp_code_vis, gr.code, gr.visibility), color = p.textDim) }
+                    BigButton(stringResource(R.string.grp_share)) { ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, ctx.getString(R.string.grp_join_text, gr.code)), ctx.getString(R.string.grp_invite_chooser)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     Spacer(Modifier.width(6.dp))
-                    BigButton("LEAVE", color = K.Danger) { g.socket.leaveGroup(gr.id); scope.launch { runCatching { g.api.leaveGroup(gr.id) }; active = null; refresh() } }
+                    BigButton(stringResource(R.string.grp_leave), color = K.Danger) { g.socket.leaveGroup(gr.id); scope.launch { runCatching { g.api.leaveGroup(gr.id) }; active = null; refresh() } }
                 }
                 val here = members.values.filter { it.groupId == gr.id }
-                Text("Riding now: ${here.size}", color = p.text)
+                Text(stringResource(R.string.grp_riding_now, here.size), color = p.text)
                 here.forEach { m -> Text("• ${m.displayName}${m.vehicleName?.let { " ($it)" } ?: ""} – ${m.speedKmh?.let { "%.0f km/h".format(it) } ?: "—"}${m.socPct?.let { " · %.0f%%".format(it) } ?: ""}", color = p.textDim) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Field("Invite username", inviteUser, { inviteUser = it }, Modifier.weight(1f))
-                    BigButton("INVITE") { scope.launch { runCatching { g.api.invite(gr.id, inviteUser) }.onSuccess { g.toast("Invited"); inviteUser = "" }.onFailure { g.toast(it.message ?: "") } } }
+                    Field(stringResource(R.string.grp_invite_user), inviteUser, { inviteUser = it }, Modifier.weight(1f))
+                    BigButton(stringResource(R.string.grp_invite)) { scope.launch { runCatching { g.api.invite(gr.id, inviteUser) }.onSuccess { g.toast(ctx.getString(R.string.grp_invited)); inviteUser = "" }.onFailure { g.toast(it.message ?: "") } } }
                 }
-                SectionTitle("Chat")
+                SectionTitle(stringResource(R.string.grp_chat))
                 chat.takeLast(20).forEach { c -> Text("${c.from}: ${c.text}", color = if (c.help) K.Danger else p.text, modifier = if (c.voiceFile != null) Modifier else Modifier) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Field("Message", text, { text = it.take(1000) }, Modifier.weight(1f))
-                    BigButton("SEND") { if (text.isNotBlank()) { g.socket.send(buildJsonObject { put("type", "chat"); put("groupId", gr.id); put("text", text) }); chat += ChatLine("me", text, System.currentTimeMillis()); text = "" } }
+                    Field(stringResource(R.string.grp_message), text, { text = it.take(1000) }, Modifier.weight(1f))
+                    BigButton(stringResource(R.string.grp_send)) { if (text.isNotBlank()) { g.socket.send(buildJsonObject { put("type", "chat"); put("groupId", gr.id); put("text", text) }); chat += ChatLine("me", text, System.currentTimeMillis()); text = "" } }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BigButton(if (recorder == null) "🎤 RECORD VOICE" else "■ SEND VOICE", Modifier.weight(1f), selected = recorder != null) {
+                    BigButton(stringResource(if (recorder == null) R.string.grp_rec_voice else R.string.grp_send_voice), Modifier.weight(1f), selected = recorder != null) {
                         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { micPerm.launch(Manifest.permission.RECORD_AUDIO); return@BigButton }
                         val r = recorder
                         if (r == null) {
@@ -129,42 +131,42 @@ fun GroupScreen(activity: MainActivity) {
                             val f = recFile; val d = System.currentTimeMillis() - recStart
                             if (f != null && f.length() in 1..1_000_000) {
                                 g.socket.send(buildJsonObject { put("type", "voice"); put("groupId", gr.id); put("mime", "audio/mp4"); put("durationMs", d); put("dataBase64", Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)) })
-                                chat += ChatLine("me", "🎤 voice %.0fs".format(d / 1000.0), System.currentTimeMillis(), f)
+                                chat += ChatLine("me", ctx.getString(R.string.grp_voice, d / 1000.0), System.currentTimeMillis(), f)
                             }
                         }
                     }
-                    BigButton("🆘 HELP", Modifier.weight(1f), color = K.Danger) {
+                    BigButton(stringResource(R.string.grp_help), Modifier.weight(1f), color = K.Danger) {
                         val f = g.gps.fix.value
-                        if (f == null) g.toast("No GPS fix") else g.socket.send(buildJsonObject { put("type", "help_request"); put("groupId", gr.id); put("lat", f.lat); put("lon", f.lon); put("message", "Need assistance") })
+                        if (f == null) g.toast(ctx.getString(R.string.grp_no_fix)) else g.socket.send(buildJsonObject { put("type", "help_request"); put("groupId", gr.id); put("lat", f.lat); put("lon", f.lon); put("message", "Need assistance") })
                     }
                 }
             }
         }
-        SectionTitle("My groups")
+        SectionTitle(stringResource(R.string.grp_my))
         groups.forEach { gr -> Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${gr.name} (${gr.code})", color = p.text, modifier = Modifier.weight(1f)); BigButton(if (active?.id == gr.id) "ACTIVE" else "RIDE", selected = active?.id == gr.id) { enter(gr) } } }
+            Text("${gr.name} (${gr.code})", color = p.text, modifier = Modifier.weight(1f)); BigButton(stringResource(if (active?.id == gr.id) R.string.grp_active else R.string.grp_ride), selected = active?.id == gr.id) { enter(gr) } } }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("Group code", code, { code = it.uppercase().take(8) }, Modifier.weight(1f))
-            BigButton("JOIN") { scope.launch { runCatching { g.api.joinGroup(code) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
+            Field(stringResource(R.string.grp_code), code, { code = it.uppercase().take(8) }, Modifier.weight(1f))
+            BigButton(stringResource(R.string.grp_join)) { scope.launch { runCatching { g.api.joinGroup(code) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("New group name", newName, { newName = it.take(40) }, Modifier.weight(1f))
-            BigButton("PRIVATE") { scope.launch { runCatching { g.api.createGroup(newName, false) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
+            Field(stringResource(R.string.grp_new_name), newName, { newName = it.take(40) }, Modifier.weight(1f))
+            BigButton(stringResource(R.string.grp_private)) { scope.launch { runCatching { g.api.createGroup(newName, false) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
             Spacer(Modifier.width(4.dp))
-            BigButton("PUBLIC") { scope.launch { runCatching { g.api.createGroup(newName, true) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
+            BigButton(stringResource(R.string.grp_public)) { scope.launch { runCatching { g.api.createGroup(newName, true) }.onSuccess { enter(it); refresh() }.onFailure { g.toast(it.message ?: "") } } }
         }
-        if (invitations.isNotEmpty()) { SectionTitle("Invitations"); invitations.forEach { inv -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${inv.group.name} from ${inv.from?.displayName ?: "?"}", color = p.text, modifier = Modifier.weight(1f))
-            BigButton("ACCEPT") { scope.launch { runCatching { g.api.acceptInvitation(inv.id) }.onSuccess { enter(it); refresh() } } } } } }
-        SectionTitle("Public groups")
-        publicGroups.forEach { gr -> Row(verticalAlignment = Alignment.CenterVertically) { Text(gr.name, color = p.text, modifier = Modifier.weight(1f)); BigButton("JOIN") { scope.launch { runCatching { g.api.joinGroup(gr.code) }.onSuccess { enter(it); refresh() } } } } }
-        SectionTitle("Friends")
-        friends.forEach { f -> Row(verticalAlignment = Alignment.CenterVertically) { Text("${f.displayName} (@${f.username})", color = p.text, modifier = Modifier.weight(1f)); Pill(if (f.online) "ONLINE" else "OFFLINE", if (f.online) K.Regen else p.textDim) } }
+        if (invitations.isNotEmpty()) { SectionTitle(stringResource(R.string.grp_invitations)); invitations.forEach { inv -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.grp_inv_from, inv.group.name, inv.from?.displayName ?: "?"), color = p.text, modifier = Modifier.weight(1f))
+            BigButton(stringResource(R.string.grp_accept)) { scope.launch { runCatching { g.api.acceptInvitation(inv.id) }.onSuccess { enter(it); refresh() } } } } } }
+        SectionTitle(stringResource(R.string.grp_public_groups))
+        publicGroups.forEach { gr -> Row(verticalAlignment = Alignment.CenterVertically) { Text(gr.name, color = p.text, modifier = Modifier.weight(1f)); BigButton(stringResource(R.string.grp_join)) { scope.launch { runCatching { g.api.joinGroup(gr.code) }.onSuccess { enter(it); refresh() } } } } }
+        SectionTitle(stringResource(R.string.grp_friends))
+        friends.forEach { f -> Row(verticalAlignment = Alignment.CenterVertically) { Text("${f.displayName} (@${f.username})", color = p.text, modifier = Modifier.weight(1f)); Pill(stringResource(if (f.online) R.string.grp_online else R.string.grp_offline), if (f.online) K.Regen else p.textDim) } }
         requests.filter { it.status == "pending" && it.from?.username != settings.username }.forEach { r -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Request from ${r.from?.displayName}", color = p.text, modifier = Modifier.weight(1f)); BigButton("ACCEPT") { scope.launch { runCatching { g.api.acceptFriend(r.id) }; refresh() } } } }
+            Text(stringResource(R.string.grp_req_from, r.from?.displayName ?: ""), color = p.text, modifier = Modifier.weight(1f)); BigButton(stringResource(R.string.grp_accept)) { scope.launch { runCatching { g.api.acceptFriend(r.id) }; refresh() } } } }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("Add friend (username)", friendUser, { friendUser = it }, Modifier.weight(1f))
-            BigButton("ADD") { scope.launch { runCatching { g.api.requestFriend(friendUser) }.onSuccess { g.toast("Request sent"); friendUser = "" }.onFailure { g.toast(it.message ?: "") } } }
+            Field(stringResource(R.string.grp_add_friend), friendUser, { friendUser = it }, Modifier.weight(1f))
+            BigButton(stringResource(R.string.grp_add)) { scope.launch { runCatching { g.api.requestFriend(friendUser) }.onSuccess { g.toast(ctx.getString(R.string.grp_req_sent)); friendUser = "" }.onFailure { g.toast(it.message ?: "") } } }
         }
     }
 }
@@ -176,10 +178,10 @@ fun GroupScreen(activity: MainActivity) {
 fun StarkCompatCard() {
     val ctx = LocalContext.current; val p = LocalPalette.current
     Card(Modifier.fillMaxWidth()) {
-        Text("STARK VARG RIDERS", style = labelStyle(12), color = K.Warn)
-        Text("No public or authorised API for Stark group rides, Stark accounts or Stark cloud could be found, and no app named \"VargLink\" could be verified. Kinetic OS therefore cannot show real Stark riders or appear in a Stark group ride, and does not attempt to emulate Stark devices or accounts.", color = p.textDim, style = labelStyle(10))
-        Text("Riding together with Stark owners: invite them to a Kinetic group (works on any Android phone), or open the official Stark app.", color = p.textDim, style = labelStyle(10))
-        BigButton("OPEN STARK APP / STORE", Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Text(stringResource(R.string.stark_title), style = labelStyle(12), color = K.Warn)
+        Text(stringResource(R.string.stark_text1), color = p.textDim, style = labelStyle(10))
+        Text(stringResource(R.string.stark_text2), color = p.textDim, style = labelStyle(10))
+        BigButton(stringResource(R.string.stark_open), Modifier.fillMaxWidth().padding(top = 6.dp)) {
             runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=Stark%20Future")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 .onFailure { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=Stark%20Future")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Ctx } from './context';
 import { safeSend, type Conn } from './hub';
 import { verifyToken } from './logic/auth';
-import { parseClientMessage, RateLimiter, type ClientMessage } from './logic/wsMessages';
+import { parseClientMessage, RateLimiter, TokenBucket, type ClientMessage } from './logic/wsMessages';
 import { ingestAndBroadcast } from './routes/telematics';
 import { computeOnline } from './logic/online';
 import { ms } from './db';
@@ -34,6 +34,7 @@ export default async function wsRoutes(app: FastifyInstance, ctx: Ctx) {
         displayName: user.display_name,
         groups: new Set(),
         limiter: new RateLimiter(200),
+        bucket: new TokenBucket(10, 20),
         lastTraffic: Date.now(),
       };
       ctx.hub.add(conn);
@@ -49,9 +50,15 @@ export default async function wsRoutes(app: FastifyInstance, ctx: Ctx) {
         send({ type: 'ping' });
       }, PING_INTERVAL_MS);
 
+      // messages of one connection are processed strictly in order (no concurrent DB transactions per socket)
+      let chain: Promise<void> = Promise.resolve();
       socket.on('message', (data: Buffer) => {
         conn.lastTraffic = Date.now();
-        handle(data.toString('utf8')).catch((e) => {
+        const raw = data.toString('utf8');
+        // voice messages are expensive (≤ 1 MB) → cost 10 tokens; everything else 1 (pong is free)
+        const cost = raw.includes('"voice"') ? 10 : raw.includes('"pong"') ? 0 : 1;
+        if (cost > 0 && !conn.bucket.take(cost)) { err('rate_limited', 'Too many messages'); return; }
+        chain = chain.then(() => handle(raw)).catch((e) => {
           req.log.error(e);
           err('internal_error', 'Internal error');
         });

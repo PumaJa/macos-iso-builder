@@ -43,7 +43,17 @@ class VehicleConnection(
     private val gps: GpsSource,
     private val backups: suspend (FirmwareInfo, McConfTemp) -> McConfBackup,
     private val findBackup: suspend (String) -> McConfBackup?,
+    /** Persists "last time this app wrote limits to controller <uuid>" (survives app restarts). */
+    private val writeLog: WriteLog = WriteLog.InMemory(),
 ) {
+    interface WriteLog {
+        fun lastWrite(uuid: String): Long
+        fun mark(uuid: String, t: Long)
+        class InMemory : WriteLog { private val m = HashMap<String, Long>(); override fun lastWrite(uuid: String) = m[uuid] ?: 0L; override fun mark(uuid: String, t: Long) { m[uuid] = t } }
+    }
+    private var reachedOnline = false
+    fun markWrite() { _caps.value.firmware?.uuidHex?.let { writeLog.mark(it, System.currentTimeMillis()) } }
+    suspend fun refreshScript(): ScriptStatus? = client?.let { c -> queryScript(c)?.also { _script.value = it } }
     private val _status = MutableStateFlow<ConnStatus>(ConnStatus.Idle); val status: StateFlow<ConnStatus> = _status
     private val _caps = MutableStateFlow(Capabilities()); val capabilities: StateFlow<Capabilities> = _caps
     private val _sample = MutableStateFlow<TelemetrySample?>(null); val sample: StateFlow<TelemetrySample?> = _sample
@@ -89,9 +99,34 @@ class VehicleConnection(
                     withContext(NonCancellable) { runCatching { t.disconnect() } }
                 }
                 if (!autoReconnect) { _status.value = ConnStatus.Idle; break }
+                if (reachedOnline) { attempt = 1; reachedOnline = false } // a session that was online restarts the backoff
                 val wait = (1000L shl (attempt.coerceAtMost(5) - 1).coerceAtLeast(0)).coerceAtMost(15_000)
                 _status.value = ConnStatus.Reconnecting("link lost", attempt, wait)
                 delay(wait)
+            }
+        }
+    }
+
+    /**
+     * Decide which stored limits are authoritative. The backup must reflect the controller's *stored* configuration:
+     * - VESC rebooted since our last write (uptime) → the freshly read limits ARE the stored config → (re)backup them.
+     * - We wrote since boot → fresh values are our own RAM reductions → keep the backup from this boot.
+     * - Uptime unknown (old FW) → take the element-wise minimum (fail-safe: never above what the controller now allows).
+     */
+    private suspend fun reconcileBackup(fw: FirmwareInfo, fresh: McConfTemp, uptimeMs: Long?): McConfBackup {
+        val existing = findBackup(fw.uuidHex)
+        if (existing == null) return backups(fw, fresh).also { _events.tryEmit("Stored limits backed up (${fw.uuidHex.take(8)})") }
+        val now = System.currentTimeMillis()
+        return when {
+            uptimeMs != null && writeLog.lastWrite(fw.uuidHex) < now - uptimeMs ->
+                if (fresh != existing.conf || existing.firmware != fw.versionString) backups(fw, fresh).also { _events.tryEmit("Controller limits changed since last backup – backup updated") } else existing
+            uptimeMs != null -> existing
+            else -> {
+                val e = existing.conf
+                val m = e.copy(currentMaxScale = minOf(e.currentMaxScale, fresh.currentMaxScale), maxErpm = minOf(e.maxErpm, fresh.maxErpm),
+                    minErpm = maxOf(e.minErpm, fresh.minErpm), wattMax = minOf(e.wattMax, fresh.wattMax), wattMin = maxOf(e.wattMin, fresh.wattMin),
+                    inCurrentMax = minOf(e.inCurrentMax, fresh.inCurrentMax), inCurrentMin = maxOf(e.inCurrentMin, fresh.inCurrentMin))
+                if (m != e) backups(fw, m).also { _events.tryEmit("Limits capped to current controller values (power-cycle the VESC to restore stock)") } else existing
             }
         }
     }
@@ -114,21 +149,23 @@ class VehicleConnection(
             adc = probe { c.decodedAdc() },
             odometer = probe { require(c.setupValues().odometerM != null) },
         )
-        _script.value = queryScript(c)
-        caps = caps.copy(script = _script.value != null)
+        // the script may be busy right after boot → several tries before concluding "not installed"
+        var sc: ScriptStatus? = null
+        for (i in 0 until 3) { sc = queryScript(c); if (sc != null) break; delay(200) }
+        _script.value = sc
+        caps = caps.copy(script = sc != null)
+        val uptimeMs = runCatching { c.setupValues().uptimeMs }.getOrNull()
         _batteryCut.value = runCatching { c.batteryCut() }.getOrNull()
         // Configuration backup BEFORE any write is ever possible.
         var mc: McConfTemp? = null
         caps = caps.copy(mcConfTemp = probe { mc = c.mcConfTemp() })
         _caps.value = caps
-        mc?.let { conf ->
-            val existing = findBackup(fw.uuidHex)
-            _backup.value = existing ?: backups(fw, conf).also { _events.tryEmit("Stored limits backed up (${fw.uuidHex.take(8)})") }
-        }
+        mc?.let { conf -> _backup.value = reconcileBackup(fw, conf, uptimeMs) }
+        reachedOnline = true
         _status.value = ConnStatus.Online("${fw.hardwareName} · FW ${fw.versionString}" + if (ids.isNotEmpty()) " · CAN ${ids.joinToString()}" else "", t.kind == TransportKind.SIMULATION)
         val eng = TelemetryEngine(drivetrain, simulated = t.kind == TransportKind.SIMULATION).also { engine = it }
         val poller = AdaptivePoller(minMs = 1000L / 50, start = 1000L / pollHz.coerceIn(1, 50))
-        var misses = 0; var tick = 0
+        var misses = 0; var tick = 0; var scriptMisses = 0
         var imu: ImuData? = null; var bms: BmsValues? = null; var adc: DecodedAdc? = null; var odo: Long? = null
         while (isActive && t.state.value is LinkState.Connected) {
             val t0 = System.currentTimeMillis()
@@ -137,7 +174,11 @@ class VehicleConnection(
                 if (caps.imu && tick % 2 == 0) imu = runCatching { c.imu() }.getOrNull()
                 if (caps.bms && tick % 10 == 0) bms = runCatching { c.bms() }.getOrNull()
                 if (caps.adc && tick % 2 == 1) adc = runCatching { c.decodedAdc() }.getOrNull()
-                if (caps.script && tick % 20 == 5) queryScript(c)?.let { _script.value = it }
+                if (tick % 20 == 5 && (caps.script || tick % 100 == 5)) {
+                    val q = queryScript(c)
+                    if (q != null) { _script.value = q; scriptMisses = 0; if (!caps.script) { caps = caps.copy(script = true); _caps.value = caps } }
+                    else if (caps.script && ++scriptMisses >= 3) _script.value = null // AppGraph then refuses writes instead of bypassing the script
+                }
                 if (caps.odometer && tick % 50 == 0) odo = runCatching { c.setupValues().odometerM }.getOrNull() ?: odo
                 val rtt = System.currentTimeMillis() - t0
                 poller.onSuccess(rtt); misses = 0; _linkHealthy.value = true

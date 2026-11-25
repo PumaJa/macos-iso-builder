@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Release signing: keystore.properties (never committed) or env vars. Create a key with tools/make-release-key.sh.
+// Without a key the release build falls back to the debug key (installable, but updates must keep the same key).
+val ksProps = Properties().also { p ->
+    val f = rootProject.file("keystore.properties"); if (f.exists()) f.inputStream().use { p.load(it) }
+}
+fun ksValue(k: String, env: String): String? = (ksProps.getProperty(k) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
+val releaseStore: File? = ksValue("storeFile", "KINETIC_KEYSTORE")?.let { rootProject.file(it) }?.takeIf { it.exists() }
+
 android {
     namespace = "org.kineticos.app"
     compileSdk = 35
@@ -13,19 +23,33 @@ android {
         applicationId = "org.kineticos.app"
         minSdk = 26          // Android 8.0 – covers older Samsung devices; BLE + foreground services available
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
     signingConfigs {
-        // Debug-style signing so CI/dev builds of the release variant are installable. Replace for distribution.
         getByName("debug")
+        if (releaseStore != null) create("release") {
+            storeFile = releaseStore
+            storePassword = ksValue("storePassword", "KINETIC_KEYSTORE_PASSWORD")
+            keyAlias = ksValue("keyAlias", "KINETIC_KEY_ALIAS") ?: "kinetic"
+            keyPassword = ksValue("keyPassword", "KINETIC_KEY_PASSWORD") ?: ksValue("storePassword", "KINETIC_KEYSTORE_PASSWORD")
+        }
     }
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseStore != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+        }
+    }
+    // Smaller downloads: one APK per CPU architecture (+ a universal APK). Most phones need arm64-v8a.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
     compileOptions {

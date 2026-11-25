@@ -1,3 +1,4 @@
+import { plausibleTs } from './wsMessages';
 import { z } from 'zod';
 
 export const usernameSchema = z
@@ -36,7 +37,7 @@ export const RESERVED_VEHICLE_KEYS = new Set(['id', 'ownerId', 'photoUrl', 'crea
 const num = z.number().finite();
 export const vehicleStateSchema = z
   .object({
-    ts: z.number().int().positive(),
+    ts: z.number().int().positive().refine((v) => plausibleTs(v), 'timestamp outside plausible range (2020 … now+10 min)'),
     lat: num.min(-90).max(90).optional(),
     lon: num.min(-180).max(180).optional(),
     alt: num.optional(),

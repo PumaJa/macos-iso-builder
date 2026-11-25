@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -63,15 +65,15 @@ fun DashScreen(go: (Screen) -> Unit) {
         // status strip
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             val (txt, col) = when (val st = status) {
-                is ConnStatus.Online -> (if (st.simulated) "SIM" else "VESC") to (if (st.simulated) K.Sim else K.Regen)
-                is ConnStatus.Connecting -> "CONNECTING" to K.Warn
-                is ConnStatus.Reconnecting -> "RECONNECT ${st.inMs / 1000}s" to K.Warn
-                is ConnStatus.Error -> "ERROR" to K.Danger
-                ConnStatus.Idle -> "OFFLINE" to p.textDim
+                is ConnStatus.Online -> (if (st.simulated) stringResource(R.string.q_sim) else "VESC") to (if (st.simulated) K.Sim else K.Regen)
+                is ConnStatus.Connecting -> stringResource(R.string.dash_st_connecting) to K.Warn
+                is ConnStatus.Reconnecting -> stringResource(R.string.dash_st_reconnect, st.inMs / 1000) to K.Warn
+                is ConnStatus.Error -> stringResource(R.string.dash_st_error) to K.Danger
+                ConnStatus.Idle -> stringResource(R.string.dash_st_offline) to p.textDim
             }
             Pill(txt, col, Modifier.padding(end = 6.dp))
-            Pill(if (gpsFix != null) "GPS ±%.0fm".format(gpsFix!!.accuracyM ?: 0.0) else "NO GPS", if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
-            if (rec != null) Pill("● REC", K.Danger)
+            Pill(if (gpsFix != null) stringResource(R.string.dash_gps, gpsFix!!.accuracyM ?: 0.0) else stringResource(R.string.dash_no_gps), if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
+            if (rec != null) Pill(stringResource(R.string.dash_rec), K.Danger)
             Spacer(Modifier.weight(1f))
             LockPill()
             Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(22), color = p.text)
@@ -79,10 +81,10 @@ fun DashScreen(go: (Screen) -> Unit) {
         if (status !is ConnStatus.Online) {
             Spacer(Modifier.height(24.dp))
             Card(Modifier.fillMaxWidth()) {
-                Text("No controller connected", style = labelStyle(14), color = p.text)
-                Text("Values below are not live. Connect a VESC via Bluetooth, USB or WiFi.", color = p.textDim)
+                Text(stringResource(R.string.dash_no_ctrl), style = labelStyle(14), color = p.text)
+                Text(stringResource(R.string.dash_no_ctrl_sub), color = p.textDim)
                 Spacer(Modifier.height(8.dp))
-                BigButton("CONNECT", Modifier.fillMaxWidth()) { go(Screen.CONNECT) }
+                BigButton(stringResource(R.string.dash_connect), Modifier.fillMaxWidth()) { go(Screen.CONNECT) }
             }
         }
         val main: @Composable (Modifier) -> Unit = { m ->
@@ -90,9 +92,10 @@ fun DashScreen(go: (Screen) -> Unit) {
                 Box(Modifier.fillMaxWidth(0.95f).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
                     PowerArc((kotlin.math.abs(pw) / maxP).toFloat(), pw < 0, Modifier.fillMaxSize(), simulated)
                     val (mainQ, mainScale, mainLabel) = when (settings.primaryValue) {
-                        PrimaryValue.SPEED -> Triple(s?.speedMps ?: Q.NA, speedScale, "$speedUnit · ${s?.speedSource?.uppercase() ?: "—"}")
+                        PrimaryValue.SPEED -> Triple(s?.speedMps ?: Q.NA, speedScale, "$speedUnit · " + when (s?.speedSource) {
+                            "vesc" -> "VESC"; "gps" -> "GPS"; else -> stringResource(R.string.dash_speed_source_none) })
                         PrimaryValue.POWER -> Triple(power, pScale, "$pUnit · ${qTag(power.quality)}")
-                        PrimaryValue.BATTERY_CURRENT -> Triple(s?.batteryCurrentA ?: Q.NA, 1.0, "A battery · ${qTag((s?.batteryCurrentA ?: Q.NA).quality)}")
+                        PrimaryValue.BATTERY_CURRENT -> Triple(s?.batteryCurrentA ?: Q.NA, 1.0, stringResource(R.string.dash_a_battery, qTag((s?.batteryCurrentA ?: Q.NA).quality)))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(fmt(mainQ, 0, mainScale), style = numStyle(if (landscape) 110 else 96, if (p.sun) FontWeight.Bold else FontWeight.Thin), color = qColor(mainQ.quality, p.text), maxLines = 1)
@@ -103,7 +106,7 @@ fun DashScreen(go: (Screen) -> Unit) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     if (settings.primaryValue == PrimaryValue.SPEED) {
                         Text(fmt(power, 1, pScale), style = numStyle(40), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
-                        Text(" $pUnit  ${if (pw < 0) "REGEN" else "POWER"}", style = labelStyle(12), color = p.textDim)
+                        Text(" $pUnit  ${stringResource(if (pw < 0) R.string.dash_regen else R.string.dash_power)}", style = labelStyle(12), color = p.textDim)
                     } else {
                         Text(fmt(s?.speedMps ?: Q.NA, 0, speedScale), style = numStyle(40), color = qColor((s?.speedMps ?: Q.NA).quality, K.Accent))
                         Text(" $speedUnit", style = labelStyle(12), color = p.textDim)
@@ -120,13 +123,13 @@ fun DashScreen(go: (Screen) -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         BatteryBar(soc.value, soc.quality, Modifier.fillMaxWidth())
-                        Text("${qTag(soc.quality)} · ${range?.let { "≈%.0f km range (EST)".format(it) } ?: "range n/a"}", style = labelStyle(10), color = p.textDim)
+                        Text("${qTag(soc.quality)} · ${range?.let { stringResource(R.string.dash_range_est, it) } ?: stringResource(R.string.dash_range_na)}", style = labelStyle(10), color = p.textDim)
                     }
                 }
                 settings.dashTiles.take(6).chunked(3).forEach { row ->
                     Row { row.forEach { key -> DashTile(key, s, engine, simulated, Modifier.weight(1f)) }; repeat(3 - row.size) { Spacer(Modifier.weight(1f)) } }
                 }
-                if ((s?.faultCode ?: 0) != 0) Pill("FAULT: ${s?.faultName ?: s?.faultCode}", K.Danger, Modifier.padding(4.dp))
+                if ((s?.faultCode ?: 0) != 0) Pill(stringResource(R.string.dash_fault, (s?.faultName ?: s?.faultCode).toString()), K.Danger, Modifier.padding(4.dp))
             }
         }
         if (landscape) Row(Modifier.weight(1f)) { main(Modifier.weight(1.3f).fillMaxHeight()); side(Modifier.weight(1f).padding(start = 8.dp)) }
@@ -136,8 +139,8 @@ fun DashScreen(go: (Screen) -> Unit) {
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (vehicle?.photoUri != null) AsyncImage(vehicle!!.photoUri, vehicle!!.name, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
             Column(Modifier.padding(horizontal = 6.dp).widthIn(max = 96.dp)) {
-                Text(vehicle?.name ?: "No vehicle", style = labelStyle(12), color = p.text, maxLines = 1)
-                Text(applied?.name ?: "STOCK", style = labelStyle(10), color = K.Accent)
+                Text(vehicle?.name ?: stringResource(R.string.dash_no_vehicle), style = labelStyle(12), color = p.text, maxLines = 2)
+                Text(applied?.name ?: stringResource(R.string.mode_stock), style = labelStyle(10), color = K.Accent)
             }
             profiles.take(4).forEach { pr ->
                 BigButton(pr.name, Modifier.weight(1f).padding(horizontal = 2.dp), selected = applied?.id == pr.id, compact = true) { scope.launch { g.toast(g.applyProfile(pr)) } }
@@ -147,10 +150,8 @@ fun DashScreen(go: (Screen) -> Unit) {
 }
 
 /** Catalog of selectable dash tiles (Settings → Dash tiles). */
-val DASH_TILE_CATALOG = linkedMapOf(
-    "VOLT" to "Voltage", "BATT_A" to "Battery current", "MOTOR_A" to "Motor current", "FET" to "Controller temp", "MOTOR_T" to "Motor temp",
-    "TRIP" to "Trip km", "ODO" to "Odometer", "WHKM" to "Wh/km (rolling)", "RANGE" to "Range", "DUTY" to "Duty", "THROTTLE" to "Throttle",
-    "LEAN" to "Lean angle", "ALT" to "Altitude", "PS" to "Power PS", "WH" to "Wh used", "REGEN" to "Wh regenerated", "AH" to "Ah used",
+val DASH_TILE_CATALOG: Map<String, Int> = linkedMapOf(
+    "VOLT" to R.string.tilecat_volt, "BATT_A" to R.string.tilecat_batt_a, "MOTOR_A" to R.string.tilecat_motor_a, "FET" to R.string.tilecat_fet, "MOTOR_T" to R.string.tilecat_motor_t, "TRIP" to R.string.tilecat_trip, "ODO" to R.string.tilecat_odo, "WHKM" to R.string.tilecat_whkm, "RANGE" to R.string.tilecat_range, "DUTY" to R.string.tilecat_duty, "THROTTLE" to R.string.tilecat_throttle, "LEAN" to R.string.tilecat_lean, "ALT" to R.string.tilecat_alt, "PS" to R.string.tilecat_ps, "WH" to R.string.tilecat_wh, "REGEN" to R.string.tilecat_regen, "AH" to R.string.tilecat_ah,
 )
 
 @Composable
@@ -158,23 +159,23 @@ fun DashTile(key: String, s: org.kineticos.telemetry.TelemetrySample?, engine: o
     val cq = if (simulated) Quality.SIMULATED else Quality.CALCULATED
     val eq = if (simulated) Quality.SIMULATED else Quality.ESTIMATED
     when (key) {
-        "VOLT" -> Metric("Volt", s?.voltageV ?: Q.NA, "V", 1, modifier = modifier)
-        "BATT_A" -> Metric("Batt A", s?.batteryCurrentA ?: Q.NA, "A", 0, modifier = modifier)
-        "MOTOR_A" -> Metric("Motor A", s?.motorCurrentA ?: Q.NA, "A", 0, modifier = modifier)
-        "FET" -> Metric("FET", s?.tempMosC ?: Q.NA, "°C", 0, modifier = modifier)
-        "MOTOR_T" -> Metric("Motor", s?.tempMotorC ?: Q.NA, "°C", 0, modifier = modifier)
-        "TRIP" -> Metric("Trip", Q.of(engine?.distanceM?.div(1000), cq), "km", 1, modifier = modifier)
-        "ODO" -> Metric("Odo", s?.odometerKm ?: Q.NA, "km", 0, modifier = modifier)
-        "WHKM" -> Metric("Wh/km", Q.of(engine?.rollingWhPerKm(), cq), "", 0, modifier = modifier)
-        "RANGE" -> Metric("Range", Q.of(s?.let { engine?.rangeKm(it) }, eq), "km", 0, modifier = modifier)
-        "DUTY" -> Metric("Duty", s?.duty ?: Q.NA, "%", 0, 100.0, modifier = modifier)
-        "THROTTLE" -> Metric("Throttle", s?.throttle ?: Q.NA, "%", 0, 100.0, modifier = modifier)
-        "LEAN" -> Metric("Lean", s?.leanDeg ?: Q.NA, "°", 0, modifier = modifier)
-        "ALT" -> Metric("Alt", Q.of(s?.gps?.altM, Quality.MEASURED), "m", 0, modifier = modifier)
-        "PS" -> Metric("Power", Q.of(s?.batteryPowerW?.value?.let { org.kineticos.telemetry.Calc.ps(it) }, s?.batteryPowerW?.quality ?: Quality.UNAVAILABLE), "PS", 0, modifier = modifier)
-        "WH" -> Metric("Used", s?.wattHours ?: Q.NA, "Wh", 0, modifier = modifier)
-        "REGEN" -> Metric("Regen", s?.wattHoursCharged ?: Q.NA, "Wh", 0, modifier = modifier)
-        "AH" -> Metric("Ah", s?.ampHours ?: Q.NA, "Ah", 2, modifier = modifier)
+        "VOLT" -> Metric(stringResource(R.string.tile_volt), s?.voltageV ?: Q.NA, "V", 1, modifier = modifier)
+        "BATT_A" -> Metric(stringResource(R.string.tile_batt_a), s?.batteryCurrentA ?: Q.NA, "A", 0, modifier = modifier)
+        "MOTOR_A" -> Metric(stringResource(R.string.tile_motor_a), s?.motorCurrentA ?: Q.NA, "A", 0, modifier = modifier)
+        "FET" -> Metric(stringResource(R.string.tile_fet), s?.tempMosC ?: Q.NA, "°C", 0, modifier = modifier)
+        "MOTOR_T" -> Metric(stringResource(R.string.tile_motor_t), s?.tempMotorC ?: Q.NA, "°C", 0, modifier = modifier)
+        "TRIP" -> Metric(stringResource(R.string.tile_trip), Q.of(engine?.distanceM?.div(1000), cq), "km", 1, modifier = modifier)
+        "ODO" -> Metric(stringResource(R.string.tile_odo), s?.odometerKm ?: Q.NA, "km", 0, modifier = modifier)
+        "WHKM" -> Metric(stringResource(R.string.tile_whkm), Q.of(engine?.rollingWhPerKm(), cq), "", 0, modifier = modifier)
+        "RANGE" -> Metric(stringResource(R.string.tile_range), Q.of(s?.let { engine?.rangeKm(it) }, eq), "km", 0, modifier = modifier)
+        "DUTY" -> Metric(stringResource(R.string.tile_duty), s?.duty ?: Q.NA, "%", 0, 100.0, modifier = modifier)
+        "THROTTLE" -> Metric(stringResource(R.string.tile_throttle), s?.throttle ?: Q.NA, "%", 0, 100.0, modifier = modifier)
+        "LEAN" -> Metric(stringResource(R.string.tile_lean), s?.leanDeg ?: Q.NA, "°", 0, modifier = modifier)
+        "ALT" -> Metric(stringResource(R.string.tile_alt), Q.of(s?.gps?.altM, Quality.MEASURED), "m", 0, modifier = modifier)
+        "PS" -> Metric(stringResource(R.string.tile_ps), Q.of(s?.batteryPowerW?.value?.let { org.kineticos.telemetry.Calc.ps(it) }, s?.batteryPowerW?.quality ?: Quality.UNAVAILABLE), "PS", 0, modifier = modifier)
+        "WH" -> Metric(stringResource(R.string.tile_wh), s?.wattHours ?: Q.NA, "Wh", 0, modifier = modifier)
+        "REGEN" -> Metric(stringResource(R.string.tile_regen), s?.wattHoursCharged ?: Q.NA, "Wh", 0, modifier = modifier)
+        "AH" -> Metric(stringResource(R.string.tile_ah), s?.ampHours ?: Q.NA, "Ah", 2, modifier = modifier)
         else -> Spacer(modifier)
     }
 }
@@ -183,16 +184,16 @@ fun DashTile(key: String, s: org.kineticos.telemetry.TelemetrySample?, engine: o
 @Composable
 fun ModeBadge(applied: org.kineticos.vehicle.RideProfile?, script: org.kineticos.vehicle.ScriptStatus?) {
     val p = LocalPalette.current
-    val name = applied?.name ?: "STOCK"
+    val name = applied?.name ?: stringResource(R.string.mode_stock)
     val col = when (applied?.id) { "eco" -> K.Regen; "race" -> K.Danger; "crawl" -> K.Warn; null -> p.textDim; else -> K.Accent }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 6.dp)) {
         Box(Modifier.clip(RoundedCornerShape(10.dp)).background(col.copy(alpha = 0.18f)).border(2.dp, col, RoundedCornerShape(10.dp)).padding(horizontal = 18.dp, vertical = 4.dp)) {
             Text(name, style = labelStyle(22).copy(fontWeight = FontWeight.Bold), color = col)
         }
-        applied?.let { Text("REGEN %.0f%% · %s".format(it.regenFraction * 100, it.character.label.uppercase()), style = labelStyle(10), color = p.textDim) }
+        applied?.let { Text(stringResource(R.string.mode_regen_char, it.regenFraction * 100, it.character.uiLabel().uppercase()), style = labelStyle(10), color = p.textDim) }
         script?.let { sc ->
-            val why = listOfNotNull("FET".takeIf { sc.derateMosfet }, "MOTOR".takeIf { sc.derateMotor }, "VOLTAGE".takeIf { sc.derateVoltage })
-            Text(if (why.isEmpty()) "VEHICLE SCRIPT · %.0f%%".format(sc.effectiveScale * 100) else "DERATED %.0f%% · %s".format(sc.effectiveScale * 100, why.joinToString("/")),
+            val why = listOfNotNull(stringResource(R.string.derate_fet).takeIf { sc.derateMosfet }, stringResource(R.string.derate_motor).takeIf { sc.derateMotor }, stringResource(R.string.derate_voltage).takeIf { sc.derateVoltage })
+            Text(if (why.isEmpty()) stringResource(R.string.mode_script, sc.effectiveScale * 100) else stringResource(R.string.mode_derated, sc.effectiveScale * 100, why.joinToString("/")),
                 style = labelStyle(10), color = if (why.isEmpty()) p.textDim else K.Warn)
         }
     }

@@ -72,6 +72,25 @@ export function parseClientMessage(raw: string): ParseResult {
 }
 
 /** Token-less minimum-interval limiter (default 5 Hz). */
+/** Token bucket for all message types: `rate` messages/s sustained, bursts up to `burst`. */
+export class TokenBucket {
+  private tokens: number;
+  private last: number;
+  constructor(private rate = 10, private burst = 20, now = Date.now()) { this.tokens = burst; this.last = now; }
+  take(cost = 1, now = Date.now()): boolean {
+    this.tokens = Math.min(this.burst, this.tokens + ((now - this.last) / 1000) * this.rate);
+    this.last = now;
+    if (this.tokens < cost) return false;
+    this.tokens -= cost;
+    return true;
+  }
+}
+
+/** Plausible client timestamps: not before 2020, not more than 10 min in the future (bad clocks would freeze "latest"). */
+export const MIN_TS = Date.UTC(2020, 0, 1);
+export const MAX_FUTURE_MS = 10 * 60_000;
+export const plausibleTs = (ts: number, now = Date.now()) => ts >= MIN_TS && ts <= now + MAX_FUTURE_MS;
+
 export class RateLimiter {
   private last = 0;
   constructor(private minIntervalMs = 200) {}

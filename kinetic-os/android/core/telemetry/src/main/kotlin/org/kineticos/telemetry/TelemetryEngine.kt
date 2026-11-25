@@ -31,7 +31,7 @@ object Calc {
      */
     fun socFromCellVoltage(v: Double, chem: Chemistry = Chemistry.NMC): Double {
         val t = chem.curve
-        if (v <= t.first().first) return 0.0
+        if (!v.isFinite() || v <= t.first().first) return 0.0
         if (v >= t.last().first) return 100.0
         val i = t.indexOfLast { it.first <= v }
         val (v0, s0) = t[i]; val (v1, s1) = t[i + 1]
@@ -60,7 +60,7 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
     var movingTimeMs = 0L; private set
     var maxPowerW = 0.0; private set
 
-    fun resetTrip() { whAtStart = null; whChgAtStart = null; ahAtStart = null; tachAtStart = null; maxSpeedMps = 0.0; distanceM = 0.0; movingTimeMs = 0; maxPowerW = 0.0 }
+    fun resetTrip() { window.clear(); whAtStart = null; whChgAtStart = null; ahAtStart = null; tachAtStart = null; maxSpeedMps = 0.0; distanceM = 0.0; movingTimeMs = 0; maxPowerW = 0.0 }
 
     fun process(
         t: Long, v: VescValues?, gps: GpsFix?, imu: ImuData?, bms: BmsValues?, controllers: Int = 1,
@@ -71,7 +71,8 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         val eq = if (simulated) Quality.SIMULATED else Quality.ESTIMATED
 
         val vescSpeed = v?.erpm?.takeIf { !it.isNaN() && drivetrain.configured }?.let { Calc.wheelSpeedMps(it, drivetrain) }
-        val gpsSpeed = gps?.speedMps?.takeIf { (gps.accuracyM ?: 99.0) < 25 }
+        // GPS speed only from a fresh (< 3 s), accurate fix – a stale 0 m/s must never look like standstill
+        val gpsSpeed = gps?.speedMps?.takeIf { (gps.accuracyM ?: 99.0) < 25 && abs(t - gps.timeMs) < 3000 }
         val (speed, src, sq) = when {
             vescSpeed != null -> Triple(abs(vescSpeed), "vesc", cq)
             gpsSpeed != null -> Triple(gpsSpeed, "gps", mq)
@@ -95,13 +96,14 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         }
         lastSpeed = speed; lastT = t
 
-        val cells = drivetrain.batteryCellsSeries
+        val cells = drivetrain.batteryCellsSeries?.takeIf { it > 0 }
         val cap = drivetrain.batteryCapacityAh
-        if (v != null && cells != null && socAnchor == null && !v.inputVoltageV.isNaN()) {
+        val vOk = v != null && v.inputVoltageV.isFinite() && v.inputVoltageV > 0
+        if (vOk && v != null && cells != null && socAnchor == null) {
             // prefer a resting anchor (|I| < 2 A); otherwise accept the first sample and re-anchor when the pack rests
             socAnchor = Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry); ahAnchor = v.ampHours; ahChgAnchor = v.ampHoursCharged
             anchoredAtRest = abs(v.inputCurrentA) < 2.0
-        } else if (v != null && cells != null && !anchoredAtRest && abs(v.inputCurrentA) < 2.0) {
+        } else if (vOk && v != null && cells != null && !anchoredAtRest && abs(v.inputCurrentA) < 2.0) {
             socAnchor = Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry); ahAnchor = v.ampHours; ahChgAnchor = v.ampHoursCharged; anchoredAtRest = true
         }
         val soc: Q = when {
@@ -111,7 +113,7 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
                 val used = (v.ampHours - ahAnchor) - (v.ampHoursCharged - ahChgAnchor)
                 Q.of((socAnchor!! - used / cap * 100).coerceIn(0.0, 100.0), eq)
             }
-            v != null && cells != null -> { socSource = "voltage"; Q.of(Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry), eq) }
+            vOk && v != null && cells != null -> { socSource = "voltage"; Q.of(Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry), eq) }
             else -> { socSource = "none"; Q.NA }
         }
         if (v != null) {

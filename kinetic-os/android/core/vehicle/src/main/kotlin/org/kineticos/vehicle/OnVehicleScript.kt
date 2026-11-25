@@ -72,7 +72,7 @@ object OnVehicleScript {
 }
 
 /** Two packets (store params in a free custom slot, then select it), each with its own single-use token. */
-data class ScriptModePlan(val setParams: ByteArray, val select: ByteArray, val tokens: Pair<WriteToken, WriteToken>, val summary: String, val warnings: List<String>, val slot: Int)
+data class ScriptModePlan(val setParams: ByteArray, val select: ByteArray, val tokens: Pair<WriteToken, WriteToken>, val summary: String, val warnings: List<String>, val slot: Int, val effective: RideProfile? = null)
 
 /** Translates an already gate-approved ride profile into script parameters (fractions of the backed-up stored limits). */
 fun SafetyGate.planScriptMode(
@@ -90,7 +90,7 @@ fun SafetyGate.planScriptMode(
         (b.wattMax * target.powerFraction).roundToLong(), (b.inCurrentMax * target.batteryCurrentFraction * 10).roundToInt(), erpm.roundToLong()))
     val p2 = OnVehicleScript.wrap(OnVehicleScript.setMode(slot))
     return ScriptDecision.Plan(ScriptModePlan(p1, p2, WriteToken.issue("SafetyGate", "script params") to WriteToken.issue("SafetyGate", "script select"), d.summary + " (via on-vehicle script)",
-        d.warnings + "Regen fraction is not handled by the script protocol (stored regen limits stay active)", slot))
+        d.warnings + "Regen fraction is not handled by the script protocol (stored regen limits stay active)", slot, d.effective))
 }
 
 sealed interface ScriptDecision {

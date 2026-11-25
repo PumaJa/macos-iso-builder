@@ -1,4 +1,4 @@
-import { RateLimiter } from './logic/wsMessages';
+import { RateLimiter, TokenBucket } from './logic/wsMessages';
 
 export interface Sock {
   send(data: string): void;
@@ -10,6 +10,7 @@ export interface Conn {
   displayName: string;
   groups: Set<string>;
   limiter: RateLimiter;
+  bucket: TokenBucket;
   lastTraffic: number;
 }
 

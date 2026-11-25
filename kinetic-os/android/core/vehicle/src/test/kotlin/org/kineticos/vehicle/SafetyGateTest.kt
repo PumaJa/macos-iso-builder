@@ -42,6 +42,26 @@ class SafetyGateTest {
         assertIs<GateDecision.Denied>(gate.planRideMode(fw, backup, RideProfile.ECO, RideProfile.SPORT, vehicle, moving))
     }
 
+    @Test fun regenIncreaseIsHeldWhileMovingAndAppliedAtStandstill() {
+        val d = gate.planRideMode(fw, backup, RideProfile.RACE, RideProfile.ECO, vehicle, moving) as GateDecision.Allowed
+        assertEquals(RideProfile.RACE.regenFraction, d.effective!!.regenFraction)        // 0.4 held
+        assertEquals(conf.wattMin * 0.4, decodeTemp(d.payload)[6], 1.0)
+        assertTrue(d.warnings.any { it.contains("standstill") })
+        val s = gate.planRideMode(fw, backup, RideProfile.RACE, RideProfile.ECO, vehicle, still) as GateDecision.Allowed
+        assertEquals(1.0, s.effective!!.regenFraction)
+        // more regen alone while moving is refused as a "power increase"
+        assertTrue(gate.isMorePowerful(RideProfile.RACE.copy(regenFraction = 0.9), RideProfile.RACE))
+    }
+
+    @Test fun invalidInputsAndRestoreRules() {
+        assertIs<GateDecision.Denied>(gate.planRideMode(fw, backup, null, RideProfile.ECO.copy(speedLimitKmh = Double.NaN), vehicle, still))
+        assertIs<GateDecision.Denied>(gate.planRideMode(fw, backup, null, RideProfile.ECO.copy(reverseSpeedLimitKmh = -5.0), vehicle, still))
+        assertIs<GateDecision.Denied>(gate.planRideMode(fw.copy(uuidHex = ""), backup.copy(vescUuid = ""), null, RideProfile.ECO, vehicle, still))
+        assertIs<GateDecision.Denied>(gate.planRestore(backup, moving))
+        assertIs<GateDecision.Denied>(gate.planRestore(backup, still.copy(speedKmh = null, erpm = null)))
+        assertIs<GateDecision.Allowed>(gate.planRestore(backup, still))
+    }
+
     @Test fun reducingPowerWhileMovingAllowed() {
         assertIs<GateDecision.Allowed>(gate.planRideMode(fw, backup, RideProfile.RACE, RideProfile.ECO, vehicle, moving))
     }

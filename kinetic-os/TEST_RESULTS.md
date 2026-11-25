@@ -16,7 +16,7 @@ Three levels, kept strictly apart:
 | app (JVM + Robolectric) | 22 | ✅ | **+ E2E anti-theft lock: PIN, refusal while moving, modes blocked, tamper → warning, lockout** · **+ E2E: simulator with emulated kinetic.lisp → mode applied via script, setup check renders** · REST/WS (reconnect), telematics mapping, Room recorder, route guidance, **OSRM parsing + turn-by-turn**, **alert notifications (dedupe, channel)**, **overlay timeline + renderer**, Compose UI with simulator |
 | server (vitest) | 52 | ✅ | **+ theft alert / locked movement watch, migration 002 against PostGIS** · incl. **/route OSRM proxy (7 tests)** and integration against postgis/postgis:16-3.4 |
 | LispBM (real LispBM 0.41 interpreter) | 223 + 9 smoke | ✅ | **+ immobilizer: EEPROM persistence over simulated reboot, output re-assert, PIN/lockout, tamper** · ceiling, mode accept/reject rules, clamping, derating, rate limiter, status byte layout, protocol v1/v2 |
-| **Total** | **429** (145 Android + 52 server + 232 LispBM) | ✅ | |
+| **Total** | **460** (149 Android + 55 server + 253 LispBM + 1 instrumented) | ✅ | Code-review fixes covered: restore/regen/derate standstill rules, invalid inputs, empty UUID, alert dedupe by id, stale GPS, NaN voltage, timestamp plausibility, WS token bucket, PIN lockout persisted across reboots; German UI render test |
 
 Bugs found by these tests and fixed: decoder stall on corrupted length field; SafetyGate refusing ECO from stock while moving;
 WebSocket not reconnecting after server-initiated close; simulated BMS values tagged MEAS; meaningless wheel speed without vehicle profile.

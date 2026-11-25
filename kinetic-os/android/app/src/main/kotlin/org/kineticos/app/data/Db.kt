@@ -36,7 +36,8 @@ data class LapEntity(@PrimaryKey(autoGenerate = true) val pk: Long = 0, val trac
 }
 @Dao interface BackupDao {
     @Insert suspend fun insert(b: BackupEntity)
-    @Query("SELECT * FROM backups WHERE vescUuid = :uuid ORDER BY takenAt ASC LIMIT 1") suspend fun first(uuid: String): BackupEntity?
+    /** Latest authoritative backup for the controller (see VehicleConnection.reconcileBackup). */
+    @Query("SELECT * FROM backups WHERE vescUuid = :uuid ORDER BY takenAt DESC, pk DESC LIMIT 1") suspend fun first(uuid: String): BackupEntity?
     @Query("SELECT * FROM backups ORDER BY takenAt DESC") fun all(): Flow<List<BackupEntity>>
 }
 @Dao interface RideDao {

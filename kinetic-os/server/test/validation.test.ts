@@ -16,7 +16,7 @@ describe('validation', () => {
     expect(vehicleStateSchema.safeParse({ ...state, source: 'fake' }).success).toBe(false);
     expect(vehicleStateSchema.safeParse({ ...state, lat: 91 }).success).toBe(false);
     expect(vehicleStateSchema.safeParse({ ...state, socPct: 101 }).success).toBe(false);
-    expect(vehicleStateSchema.safeParse({ ts: 1, vescConnected: false, source: 'simulated' }).success).toBe(true);
+    expect(vehicleStateSchema.safeParse({ ts: Date.now(), vescConnected: false, source: 'simulated' }).success).toBe(true);
     expect(vehicleStateSchema.safeParse({ ...state, lon: undefined }).success).toBe(false);
     expect(vehicleStateSchema.safeParse({ ...state, vescConnected: undefined }).success).toBe(false);
   });
@@ -47,5 +47,12 @@ describe('validation', () => {
     const c = loadConfig({ JWT_SECRET: 'x'.repeat(32) });
     expect(c.port).toBe(8080);
     expect(c.dataDir).toBe('/data');
+  });
+});
+
+describe('vehicleState timestamp plausibility', () => {
+  it('rejects far-future and pre-2020 timestamps (would freeze the latest state / crash to_timestamp)', () => {
+    expect(vehicleStateSchema.safeParse({ ts: Date.now() + 3600_000, vescConnected: true, source: 'measured' }).success).toBe(false);
+    expect(vehicleStateSchema.safeParse({ ts: 1, vescConnected: true, source: 'measured' }).success).toBe(false);
   });
 });

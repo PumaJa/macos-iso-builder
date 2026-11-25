@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import android.content.Context
 import android.content.Intent
@@ -49,8 +51,8 @@ fun RidesScreen() {
     LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle("Rides (${rides.size})"); Spacer(Modifier.weight(1f))
-                if (compare.size >= 2) BigButton("COMPARE ${compare.size}") { comparing = true }
+                SectionTitle(stringResource(R.string.rides_title, rides.size)); Spacer(Modifier.weight(1f))
+                if (compare.size >= 2) BigButton(stringResource(R.string.rides_compare, compare.size)) { comparing = true }
             }
         }
         items(rides, key = { it.id }) { r ->
@@ -58,11 +60,11 @@ fun RidesScreen() {
             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { open = r }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(SimpleDateFormat("EEE dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(r.startedAt)) + (if (!r.finished) "  · in progress" else ""), color = p.text)
-                        Text(sum?.let { "%.1f km · %s · max %.0f km/h · %.0f Wh".format(it.distanceM / 1000, dur(it.durationMs), (it.maxSpeedMps ?: 0.0) * 3.6, it.energyUsedWh ?: 0.0) } ?: "—", color = p.textDim, style = labelStyle(11))
-                        r.profileName?.let { Text("Mode: $it", color = p.textDim, style = labelStyle(10)) }
+                        Text(SimpleDateFormat("EEE dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(r.startedAt)) + (if (!r.finished) stringResource(R.string.rides_in_progress) else ""), color = p.text)
+                        Text(sum?.let { stringResource(R.string.rides_summary, it.distanceM / 1000, dur(it.durationMs), (it.maxSpeedMps ?: 0.0) * 3.6, it.energyUsedWh ?: 0.0) } ?: "—", color = p.textDim, style = labelStyle(11))
+                        r.profileName?.let { Text(stringResource(R.string.rides_mode, it), color = p.textDim, style = labelStyle(10)) }
                     }
-                    if (r.simulated) Pill("SIM", K.Sim)
+                    if (r.simulated) Pill(stringResource(R.string.q_sim), K.Sim)
                     Spacer(Modifier.width(6.dp))
                     BigButton(if (r.id in compare) "✓" else "+", selected = r.id in compare) { if (r.id in compare) compare -= r.id else compare += r.id }
                 }
@@ -90,31 +92,31 @@ private fun RideDetail(r: RideEntity, back: () -> Unit) {
     if (video != null) { VideoOverlay(video!!, samples) { video = null }; return }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { BigButton("‹ BACK") { back() }; Spacer(Modifier.width(8.dp)); if (r.simulated) Pill("SIMULATED RIDE", K.Sim) }
+        Row(verticalAlignment = Alignment.CenterVertically) { BigButton(stringResource(R.string.btn_back)) { back() }; Spacer(Modifier.width(8.dp)); if (r.simulated) Pill(stringResource(R.string.rides_sim_ride), K.Sim) }
         sum?.let { s ->
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text("%.2f km (%s) · %s moving of %s".format(s.distanceM / 1000, s.distanceSource, dur(s.movingMs), dur(s.durationMs)), color = p.text)
-                Text("avg %.1f · max %.1f km/h · max %.1f kW".format((s.avgSpeedMps ?: 0.0) * 3.6, (s.maxSpeedMps ?: 0.0) * 3.6, (s.maxPowerW ?: 0.0) / 1000), color = p.text)
-                Text("Energy %.0f Wh used · %.0f Wh regenerated · %s Wh/km · +%.0f/−%.0f m".format(s.energyUsedWh ?: 0.0, s.energyRegenWh ?: 0.0, s.whPerKm?.let { "%.0f".format(it) } ?: "—", s.elevationGainM, s.elevationLossM), color = p.textDim)
+                Text(stringResource(R.string.rides_dist, s.distanceM / 1000, s.distanceSource, dur(s.movingMs), dur(s.durationMs)), color = p.text)
+                Text(stringResource(R.string.rides_speeds, (s.avgSpeedMps ?: 0.0) * 3.6, (s.maxSpeedMps ?: 0.0) * 3.6, (s.maxPowerW ?: 0.0) / 1000), color = p.text)
+                Text(stringResource(R.string.rides_energy, s.energyUsedWh ?: 0.0, s.energyRegenWh ?: 0.0, s.whPerKm?.let { "%.0f".format(it) } ?: "—", s.elevationGainM, s.elevationLossM), color = p.textDim)
             }
         }
         if (samples.size > 2) {
             RideMap(samples, cursor, Modifier.fillMaxWidth().height(220.dp).padding(top = 8.dp))
-            LabeledSlider("Replay", cursor, { cursor = it }, display = { cur?.let { s -> "%s · %.0f km/h · %.1f kW".format(SimpleDateFormat("HH:mm:ss").format(Date(s.t)), (s.speedMps.value ?: 0.0) * 3.6, (s.batteryPowerW.value ?: 0.0) / 1000) } ?: "" })
+            LabeledSlider(stringResource(R.string.rides_replay), cursor, { cursor = it }, display = { cur?.let { s -> "%s · %.0f km/h · %.1f kW".format(SimpleDateFormat("HH:mm:ss").format(Date(s.t)), (s.speedMps.value ?: 0.0) * 3.6, (s.batteryPowerW.value ?: 0.0) / 1000) } ?: "" })
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                BigButton(if (playing) "PAUSE" else "PLAY", Modifier.weight(1f)) { if (cursor >= 1f) cursor = 0f; playing = !playing }
-                BigButton("VIDEO OVERLAY", Modifier.weight(1f)) { videoPicker.launch("video/*") }
+                BigButton(stringResource(if (playing) R.string.rides_pause else R.string.rides_play), Modifier.weight(1f)) { if (cursor >= 1f) cursor = 0f; playing = !playing }
+                BigButton(stringResource(R.string.rides_video), Modifier.weight(1f)) { videoPicker.launch("video/*") }
             }
-            chart("Speed (km/h)", listOf(K.Accent to samples.map { it.speedMps.value?.times(3.6)?.toFloat() }), cursor)
-            chart("Battery power (kW) / motor power est.", listOf(K.Accent to samples.map { it.batteryPowerW.value?.div(1000)?.toFloat() }, K.Estimated to samples.map { it.motorPowerW.value?.div(1000)?.toFloat() }), cursor)
-            chart("Current A (battery / motor)", listOf(K.Accent to samples.map { it.batteryCurrentA.value?.toFloat() }, K.Warn to samples.map { it.motorCurrentA.value?.toFloat() }), cursor)
-            chart("Voltage", listOf(K.Regen to samples.map { it.voltageV.value?.toFloat() }), cursor)
-            chart("Temperature °C (FET / motor)", listOf(K.Warn to samples.map { it.tempMosC.value?.toFloat() }, K.Danger to samples.map { it.tempMotorC.value?.toFloat() }), cursor)
-            chart("Energy Wh (used / regen)", listOf(K.Accent to samples.map { it.wattHours.value?.toFloat() }, K.Regen to samples.map { it.wattHoursCharged.value?.toFloat() }), cursor)
-            chart("Acceleration g", listOf(K.Accent to samples.map { it.accelG.value?.toFloat() }), cursor)
-            chart("Altitude m", listOf(K.Estimated to samples.map { it.gps?.altM?.toFloat() }), cursor)
-        } else Text("Loading or no samples…", color = p.textDim)
-        SectionTitle("Export")
+            chart(stringResource(R.string.ch_speed), listOf(K.Accent to samples.map { it.speedMps.value?.times(3.6)?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_power), listOf(K.Accent to samples.map { it.batteryPowerW.value?.div(1000)?.toFloat() }, K.Estimated to samples.map { it.motorPowerW.value?.div(1000)?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_current), listOf(K.Accent to samples.map { it.batteryCurrentA.value?.toFloat() }, K.Warn to samples.map { it.motorCurrentA.value?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_voltage), listOf(K.Regen to samples.map { it.voltageV.value?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_temp), listOf(K.Warn to samples.map { it.tempMosC.value?.toFloat() }, K.Danger to samples.map { it.tempMotorC.value?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_energy), listOf(K.Accent to samples.map { it.wattHours.value?.toFloat() }, K.Regen to samples.map { it.wattHoursCharged.value?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_accel), listOf(K.Accent to samples.map { it.accelG.value?.toFloat() }), cursor)
+            chart(stringResource(R.string.ch_alt), listOf(K.Estimated to samples.map { it.gps?.altM?.toFloat() }), cursor)
+        } else Text(stringResource(R.string.rides_loading), color = p.textDim)
+        SectionTitle(stringResource(R.string.rides_export))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             BigButton("CSV", Modifier.weight(1f)) { scope.launch { share(ctx, "ride-${r.id.take(8)}.csv", "text/csv") { CsvExporter.write(samples, it) } } }
             BigButton("JSON", Modifier.weight(1f)) { scope.launch { share(ctx, "ride-${r.id.take(8)}.json", "application/json") { JsonExporter.write(samples, it, mapOf("profile" to (r.profileName ?: ""))) } } }
@@ -122,7 +124,7 @@ private fun RideDetail(r: RideEntity, back: () -> Unit) {
             BigButton("SRT", Modifier.weight(1f)) { scope.launch { share(ctx, "ride-${r.id.take(8)}.srt", "application/x-subrip") { it.append(SrtOverlay.build(samples)) } } }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-            BigButton("DELETE RIDE", Modifier.weight(1f), color = K.Danger) { scope.launch { g.db.rides().deleteSamples(r.id); g.db.rides().delete(r.id); back() } }
+            BigButton(stringResource(R.string.rides_delete), Modifier.weight(1f), color = K.Danger) { scope.launch { g.db.rides().deleteSamples(r.id); g.db.rides().delete(r.id); back() } }
         }
     }
 }
@@ -139,7 +141,7 @@ fun downsample(d: List<Float?>, n: Int): List<Float?> = if (d.size <= n) d else 
 suspend fun share(ctx: Context, name: String, mime: String, write: (Appendable) -> Unit) {
     val f = withContext(Dispatchers.IO) { File(ctx.cacheDir, "exports").apply { mkdirs() }.resolve(name).also { file -> file.bufferedWriter().use { write(it) } } }
     val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f)
-    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Export $name").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), ctx.getString(R.string.rides_export_chooser, name)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 /** Telemetry as SRT subtitles – any video editor/player can burn it into the ride video. */
@@ -182,26 +184,26 @@ private fun VideoOverlay(uri: Uri, samples: List<TelemetrySample>, back: () -> U
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp).background(Color.Black.copy(alpha = 0.45f)).padding(10.dp)) {
                     Text(fmt(s.speedMps, 0, 3.6) + " km/h", style = numStyle(48), color = Color.White)
                     Text(fmt(s.batteryPowerW, 1, 0.001) + " kW · " + fmt(s.socPct, 0) + "% · " + fmt(s.tempMotorC, 0) + "°C", style = labelStyle(14), color = K.Accent)
-                    if (s.simulated) Text("SIMULATION", style = labelStyle(12), color = K.Sim)
+                    if (s.simulated) Text(stringResource(R.string.sim_short), style = labelStyle(12), color = K.Sim)
                 }
             }
         }
-        LabeledSlider("Sync offset (video→telemetry)", offsetS, { offsetS = it }, -120f..120f, { "%+.1f s".format(it) })
+        LabeledSlider(stringResource(R.string.vid_sync), offsetS, { offsetS = it }, -120f..120f, { "%+.1f s".format(it) })
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            BigButton("‹ BACK") { vv?.stopPlayback(); back() }
-            BigButton("PLAY/PAUSE") { vv?.let { if (it.isPlaying) it.pause() else it.start() } }
+            BigButton(stringResource(R.string.btn_back)) { vv?.stopPlayback(); back() }
+            BigButton(stringResource(R.string.vid_playpause)) { vv?.let { if (it.isPlaying) it.pause() else it.start() } }
             when (val e = export) {
-                is org.kineticos.app.video.ExportState.Running -> BigButton("CANCEL ${e.percent}%", color = K.Warn) { exporter.cancel() }
-                is org.kineticos.app.video.ExportState.Done -> BigButton("SHARE MP4", color = K.Regen) {
+                is org.kineticos.app.video.ExportState.Running -> BigButton(stringResource(R.string.vid_cancel, e.percent), color = K.Warn) { exporter.cancel() }
+                is org.kineticos.app.video.ExportState.Done -> BigButton(stringResource(R.string.vid_share), color = K.Regen) {
                     val u = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", e.file)
-                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share video").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), ctx.getString(R.string.rides_share_video)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
-                else -> BigButton("EXPORT MP4") { vv?.pause(); exporter.start(uri, samples, (offsetS * 1000).toLong(), maxP) }
+                else -> BigButton(stringResource(R.string.vid_export)) { vv?.pause(); exporter.start(uri, samples, (offsetS * 1000).toLong(), maxP) }
             }
         }
-        (export as? org.kineticos.app.video.ExportState.Failed)?.let { Text("Export failed: ${it.message}", color = K.Danger, modifier = Modifier.padding(horizontal = 8.dp)) }
+        (export as? org.kineticos.app.video.ExportState.Failed)?.let { Text(stringResource(R.string.vid_failed, it.message ?: ""), color = K.Danger, modifier = Modifier.padding(horizontal = 8.dp)) }
         Row(Modifier.padding(horizontal = 8.dp)) {
-            Text("EXPORT MP4 burns the overlay into the video on the phone (uses the current sync offset). SRT export remains available for desktop editors.", color = p.textDim, style = labelStyle(10))
+            Text(stringResource(R.string.vid_hint), color = p.textDim, style = labelStyle(10))
         }
     }
 }
@@ -213,15 +215,15 @@ private fun CompareRides(ids: List<String>, back: () -> Unit) {
     LaunchedEffect(ids) { data = ids.associateWith { g.recorder.loadSamples(it) } }
     val cols = listOf(K.Accent, K.Warn, K.Regen, K.Sim, K.Danger)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        BigButton("‹ BACK") { back() }
+        BigButton(stringResource(R.string.btn_back)) { back() }
         val sums = data.mapValues { RideSummary.compute(it.value) }
         sums.entries.forEachIndexed { i, (id, s) ->
-            Text("■ %s  %.1f km · max %.0f km/h · %.0f Wh/km · %s".format(id.take(6), s.distanceM / 1000, (s.maxSpeedMps ?: 0.0) * 3.6, s.whPerKm ?: 0.0, data[id]?.firstOrNull()?.let { if (it.simulated) "SIM" else "" } ?: ""), color = cols[i % cols.size])
+            Text("■ %s  %.1f km · max %.0f km/h · %.0f Wh/km · %s".format(id.take(6), s.distanceM / 1000, (s.maxSpeedMps ?: 0.0) * 3.6, s.whPerKm ?: 0.0, data[id]?.firstOrNull()?.let { if (it.simulated) stringResource(R.string.q_sim) else "" } ?: ""), color = cols[i % cols.size])
         }
-        listOf<Pair<String, (TelemetrySample) -> Double?>>("Speed km/h" to { it.speedMps.value?.times(3.6) }, "Power kW" to { it.batteryPowerW.value?.div(1000) },
-            "FET °C" to { it.tempMosC.value }, "Wh used" to { it.wattHours.value }).forEach { (title, f) ->
-            chart(title + " (normalised by ride progress)", data.values.mapIndexed { i, l -> cols[i % cols.size] to downsample(l.map { s -> f(s)?.toFloat() }, 400) }, -1f)
+        listOf<Pair<String, (TelemetrySample) -> Double?>>(stringResource(R.string.cmp_speed) to { it.speedMps.value?.times(3.6) }, stringResource(R.string.cmp_power) to { it.batteryPowerW.value?.div(1000) },
+            stringResource(R.string.cmp_fet) to { it.tempMosC.value }, stringResource(R.string.cmp_wh) to { it.wattHours.value }).forEach { (title, f) ->
+            chart(stringResource(R.string.cmp_normalised, title), data.values.mapIndexed { i, l -> cols[i % cols.size] to downsample(l.map { s -> f(s)?.toFloat() }, 400) }, -1f)
         }
-        Text("Rides are aligned by progress (0–100%), not by distance.", color = p.textDim, style = labelStyle(10))
+        Text(stringResource(R.string.cmp_hint), color = p.textDim, style = labelStyle(10))
     }
 }

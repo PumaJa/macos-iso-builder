@@ -42,12 +42,21 @@ object AlertNotifier {
     private fun lastSeen(ctx: Context, vid: String) = ctx.getSharedPreferences(PREFS, 0).getLong(vid, 0L)
     private fun setLastSeen(ctx: Context, vid: String, ts: Long) = ctx.getSharedPreferences(PREFS, 0).edit().putLong(vid, ts).apply()
 
-    /** Posts a notification if this alert is newer than the last one shown for the vehicle. Returns true if shown. */
+    private fun seenIds(ctx: Context) = ctx.getSharedPreferences(PREFS, 0).getStringSet("ids", emptySet())!!
+    private fun markSeen(ctx: Context, id: String) {
+        val p = ctx.getSharedPreferences(PREFS, 0)
+        p.edit().putStringSet("ids", (seenIds(ctx).toList().takeLast(300) + id).toSet()).apply()
+    }
+
+    /**
+     * Posts a notification once per alert id (not by timestamp – device clocks and ordering can't be trusted).
+     * The alert is only marked as seen after it was actually shown, so a missing permission does not lose it.
+     */
     fun show(ctx: Context, vehicleName: String, vehicleId: String, a: Alert): Boolean {
-        if (a.ts <= lastSeen(ctx, vehicleId)) return false
-        setLastSeen(ctx, vehicleId, a.ts)
+        if (a.id in seenIds(ctx)) return false
         ensureChannel(ctx)
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        markSeen(ctx, a.id); if (a.ts > lastSeen(ctx, vehicleId)) setLastSeen(ctx, vehicleId, a.ts)
         val title = when (a.kind) {
             "geofence_exit" -> "⚠ $vehicleName left the geofence"
             "geofence_enter" -> "$vehicleName entered a geofence"
@@ -83,8 +92,10 @@ object AlertNotifier {
         val s = g.settingsRepo.current()
         if (s.authToken == null || s.serverUrl.isBlank() || !s.alertNotifications) return 0
         var shown = 0
-        for (v in g.vehicles.first()) {
-            val since = lastSeen(ctx, v.id)
+        // read from the database: in a cold WorkManager process the in-memory StateFlow is still empty
+        val vehicles = g.db.vehicles().all().first().mapNotNull { runCatching { org.kineticos.app.core.AppJson.decodeFromString<org.kineticos.vehicle.VehicleProfile>(it.json) }.getOrNull() }
+        for (v in vehicles) {
+            val since = (lastSeen(ctx, v.id) - 24 * 3600_000L).coerceAtLeast(0) // overlap window; duplicates are filtered by id
             val alerts = runCatching { g.api.alerts(v.id, since) }.getOrNull() ?: continue
             alerts.sortedBy { it.ts }.forEach { if (show(ctx, v.name, v.id, it)) shown++ }
         }

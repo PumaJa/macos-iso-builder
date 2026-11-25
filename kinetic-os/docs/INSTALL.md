@@ -3,9 +3,15 @@
 ## 1. Android app
 * Requirements: Android 8.0+ (API 26), BLE for wireless VESC, USB-OTG for wired. No root, no Google Play services needed.
 * Install `app-release.apk` (or `app-debug.apk`): allow "install unknown apps" for your file manager, open the APK.
-* Build yourself: JDK 17+, Android SDK 35 → `cd android && ./gradlew assembleRelease`. Output:
-  `android/app/build/outputs/apk/release/app-release.apk`. The release variant is signed with the debug key for testing –
-  create your own keystore before distributing.
+* Which APK? `KineticOS-<ver>-arm64-v8a.apk` fits almost every phone from the last ~8 years (≈ 25 MB);
+  `armeabi-v7a` for very old 32-bit phones; `universal` works everywhere (≈ 59 MB).
+* Build yourself: JDK 17+, Android SDK 35 → `cd android && ./gradlew assembleRelease`. Outputs in
+  `android/app/build/outputs/apk/release/` (one per architecture + universal).
+* **Your own signing key** (needed so future versions install as updates): run `android/tools/make-release-key.sh` once.
+  It creates `kinetic-release.jks` + `keystore.properties` (both git-ignored – back them up!). Alternatively set
+  `KINETIC_KEYSTORE`, `KINETIC_KEYSTORE_PASSWORD` (and optionally `KINETIC_KEY_ALIAS`, `KINETIC_KEY_PASSWORD`).
+  Without a key the release build is signed with the local debug key. Switching keys later requires uninstalling the app
+  once (ride data on the phone is lost unless exported first).
 * First start: grant location (GPS + BLE scan on Android ≤ 11), Bluetooth and notification permissions.
   For background recording on Samsung: Settings → Battery → Background usage limits → **Never sleeping apps** → Kinetic OS,
   and tap *Settings → Battery optimisation exception* in the app.

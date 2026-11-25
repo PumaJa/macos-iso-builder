@@ -1,4 +1,7 @@
 package org.kineticos.app.ui
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
+import androidx.annotation.StringRes
 
 import android.view.WindowManager
 import android.widget.Toast
@@ -25,11 +28,11 @@ import org.kineticos.app.graph
 import org.kineticos.app.ui.screens.*
 import org.kineticos.app.ui.screens.LockedOverlay
 
-enum class Screen(val label: String, val icon: ImageVector) {
-    DASH("Dash", Icons.Filled.Speed), MAP("Map", Icons.Filled.Map), MODES("Modes", Icons.Filled.Tune),
-    LIVE("Telemetry", Icons.Filled.MonitorHeart), RIDES("Rides", Icons.Filled.Timeline), GROUP("Group", Icons.Filled.Groups),
-    RACE("Race", Icons.Filled.Flag), GARAGE("Garage", Icons.Filled.TwoWheeler), CONNECT("Connect", Icons.Filled.Bluetooth),
-    REMOTE("Remote", Icons.Filled.Satellite), SETUP("VESC Setup", Icons.Filled.Build), SETTINGS("Settings", Icons.Filled.Settings),
+enum class Screen(@StringRes val label: Int, val icon: ImageVector) {
+    DASH(R.string.nav_dash, Icons.Filled.Speed), MAP(R.string.nav_map, Icons.Filled.Map), MODES(R.string.nav_modes, Icons.Filled.Tune),
+    LIVE(R.string.nav_telemetry, Icons.Filled.MonitorHeart), RIDES(R.string.nav_rides, Icons.Filled.Timeline), GROUP(R.string.nav_group, Icons.Filled.Groups),
+    RACE(R.string.nav_race, Icons.Filled.Flag), GARAGE(R.string.nav_garage, Icons.Filled.TwoWheeler), CONNECT(R.string.nav_connect, Icons.Filled.Bluetooth),
+    REMOTE(R.string.nav_remote, Icons.Filled.Satellite), SETUP(R.string.nav_setup, Icons.Filled.Build), SETTINGS(R.string.nav_settings, Icons.Filled.Settings),
 }
 
 @Composable
@@ -39,6 +42,8 @@ fun KineticRoot(activity: MainActivity) {
     var screen by rememberSaveable { mutableStateOf(Screen.DASH) }
     var dimmed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val markerText = stringResource(R.string.toast_marker)
+    val notRecordingText = stringResource(R.string.toast_not_recording)
 
     LaunchedEffect(Unit) { g.toasts.collect { Toast.makeText(activity, it, Toast.LENGTH_SHORT).show() } }
     LaunchedEffect(Unit) { activity.deepLinkJoin.collect { screen = Screen.GROUP } }
@@ -57,7 +62,7 @@ fun KineticRoot(activity: MainActivity) {
                     val next = ps[(cur + if (a == KeyAction.MODE_UP) 1 else ps.size - 1) % ps.size]
                     g.toast(g.applyProfile(next))
                 }
-                KeyAction.LAP_MARK -> g.toast(if (g.recorder.active.value != null) "Marker" else "Not recording")
+                KeyAction.LAP_MARK -> g.toast(if (g.recorder.active.value != null) markerText else notRecordingText)
                 KeyAction.WAKE -> {}
             }
         }
@@ -89,7 +94,7 @@ fun KineticRoot(activity: MainActivity) {
                 if (landscape) Row(Modifier.weight(1f)) {
                     NavigationRail(containerColor = p.surface) {
                         Screen.entries.forEach { s -> NavigationRailItem(selected = s == screen, onClick = { screen = s; lastInteraction = System.currentTimeMillis() },
-                            icon = { Icon(s.icon, s.label) }, label = { Text(s.label, style = labelStyle(9)) },
+                            icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
                             colors = NavigationRailItemDefaults.colors(selectedIconColor = K.Accent, indicatorColor = K.Accent.copy(alpha = 0.15f))) }
                     }
                     Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
@@ -98,14 +103,14 @@ fun KineticRoot(activity: MainActivity) {
                     val primary = listOf(Screen.DASH, Screen.MAP, Screen.MODES, Screen.LIVE)
                     var more by remember { mutableStateOf(false) }
                     NavigationBar(containerColor = p.surface) {
-                        primary.forEach { s -> NavigationBarItem(selected = s == screen, onClick = { screen = s }, icon = { Icon(s.icon, s.label) }, label = { Text(s.label, style = labelStyle(9)) },
+                        primary.forEach { s -> NavigationBarItem(selected = s == screen, onClick = { screen = s }, icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
                             colors = NavigationBarItemDefaults.colors(selectedIconColor = K.Accent, indicatorColor = K.Accent.copy(alpha = 0.15f))) }
-                        NavigationBarItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, "More") }, label = { Text("More", style = labelStyle(9)) })
+                        NavigationBarItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, stringResource(R.string.nav_more)) }, label = { Text(stringResource(R.string.nav_more), style = labelStyle(9)) })
                     }
-                    if (more) AlertDialog(onDismissRequest = { more = false }, confirmButton = {}, containerColor = p.surface, title = { Text("Menu") }, text = {
+                    if (more) AlertDialog(onDismissRequest = { more = false }, confirmButton = {}, containerColor = p.surface, title = { Text(stringResource(R.string.nav_menu)) }, text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Screen.entries.filter { it !in primary }.chunked(2).forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { s -> BigButton(s.label, Modifier.weight(1f), selected = s == screen) { screen = s; more = false } } }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { s -> BigButton(stringResource(s.label), Modifier.weight(1f), selected = s == screen) { screen = s; more = false } } }
                             }
                         }
                     })
@@ -152,7 +157,7 @@ fun PipDash() {
                 Text(fmt(s?.speedMps ?: org.kineticos.telemetry.Q.NA, 0, 3.6), style = numStyle(44), color = qColor((s?.speedMps ?: org.kineticos.telemetry.Q.NA).quality, p.text))
                 Text(" km/h", style = labelStyle(9), color = p.textDim)
                 Spacer(Modifier.weight(1f))
-                Text(applied?.name ?: "STOCK", style = labelStyle(12), color = K.Accent)
+                Text(applied?.name ?: stringResource(R.string.mode_stock), style = labelStyle(12), color = K.Accent)
             }
             Row {
                 Text(fmt(s?.batteryPowerW ?: org.kineticos.telemetry.Q.NA, 1, 0.001) + " kW", style = labelStyle(12), color = K.Accent)
@@ -160,7 +165,7 @@ fun PipDash() {
                 Text(fmt(s?.socPct ?: org.kineticos.telemetry.Q.NA, 0) + "%", style = labelStyle(12), color = p.text)
             }
             recent?.let { Text(it.text, style = labelStyle(10), color = Color.White, maxLines = 1) }
-            if (s?.simulated == true) Text("SIMULATION", style = labelStyle(9), color = K.Sim)
+            if (s?.simulated == true) Text(stringResource(R.string.sim_short), style = labelStyle(9), color = K.Sim)
         }
     }
 }

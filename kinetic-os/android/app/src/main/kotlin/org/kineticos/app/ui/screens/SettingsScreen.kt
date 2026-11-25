@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import android.content.Intent
 import android.net.Uri
@@ -30,64 +32,65 @@ fun SettingsScreen() {
     var pass by remember { mutableStateOf("") }
     var display by remember { mutableStateOf("") }
     var msg by remember { mutableStateOf<String?>(null) }
+    val offText = stringResource(R.string.set_off)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        SectionTitle("Display")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { ThemeMode.entries.forEach { m -> BigButton(m.name, Modifier.weight(1f), selected = s.theme == m) { upd { it.copy(theme = m) } } } }
+        SectionTitle(stringResource(R.string.set_display))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { ThemeMode.entries.forEach { m -> BigButton(stringResource(when (m) { ThemeMode.NIGHT -> R.string.theme_night; ThemeMode.DAY -> R.string.theme_day; ThemeMode.SUN -> R.string.theme_sun; ThemeMode.AUTO -> R.string.theme_auto }), Modifier.weight(1f), selected = s.theme == m) { upd { it.copy(theme = m) } } } }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
             SpeedUnit.entries.forEach { u -> BigButton(u.name, Modifier.weight(1f), selected = s.speedUnit == u) { upd { it.copy(speedUnit = u) } } }
             PowerUnit.entries.forEach { u -> BigButton(u.name, Modifier.weight(1f), selected = s.powerUnit == u) { upd { it.copy(powerUnit = u) } } }
         }
-        SectionTitle("Dash")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { PrimaryValue.entries.forEach { v -> BigButton(v.name.replace('_', ' '), Modifier.weight(1f), selected = s.primaryValue == v, compact = true) { upd { it.copy(primaryValue = v) } } } }
-        Text("Dash tiles (tap to add/remove, max 6, order = tap order): " + s.dashTiles.joinToString { DASH_TILE_CATALOG[it] ?: it }, color = p.textDim, style = labelStyle(10))
+        SectionTitle(stringResource(R.string.set_dash))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { PrimaryValue.entries.forEach { v -> BigButton(stringResource(when (v) { PrimaryValue.SPEED -> R.string.pv_speed; PrimaryValue.POWER -> R.string.pv_power; PrimaryValue.BATTERY_CURRENT -> R.string.pv_battery_current }), Modifier.weight(1f), selected = s.primaryValue == v, compact = true) { upd { it.copy(primaryValue = v) } } } }
+        Text(stringResource(R.string.set_tiles, s.dashTiles.map { DASH_TILE_CATALOG[it]?.let { id -> stringResource(id) } ?: it }.joinToString()), color = p.textDim, style = labelStyle(10))
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            DASH_TILE_CATALOG.forEach { (k, label) -> BigButton(label, selected = k in s.dashTiles, compact = true) {
+            DASH_TILE_CATALOG.entries.forEach { (k, label) -> BigButton(stringResource(label), selected = k in s.dashTiles, compact = true) {
                 upd { st -> st.copy(dashTiles = if (k in st.dashTiles) st.dashTiles - k else (st.dashTiles + k).takeLast(6)) } } }
         }
-        Toggle("Spoken warnings", s.voiceAlerts, { v -> upd { it.copy(voiceAlerts = v) } }, "Battery steps, temperatures before cut-off, faults, connection loss")
-        Toggle("Vibrate on warnings", s.vibrateAlerts, { v -> upd { it.copy(vibrateAlerts = v) } })
-        Toggle("Mini-cockpit when leaving the app (picture-in-picture)", s.pipOnLeave, { v -> upd { it.copy(pipOnLeave = v) } }, "Keep a navigation app in front and still see speed, power, battery and mode")
-        Toggle("Glove mode (large controls)", s.gloveMode, { v -> upd { it.copy(gloveMode = v) } })
-        Toggle("Keep screen on", s.keepScreenOn, { v -> upd { it.copy(keepScreenOn = v) } })
-        LabeledSlider("Dim when idle & stationary", s.dimAfterIdleS.toFloat(), { v -> upd { it.copy(dimAfterIdleS = v.toInt()) } }, 0f..600f, { if (it < 1) "off" else "%.0f s".format(it) })
-        SectionTitle("Cockpit")
-        Toggle("Start on boot", s.autoStartOnBoot, { v -> upd { it.copy(autoStartOnBoot = v) } }, "Starts the background service and auto-connects. Android may require the app to be the HOME app to show the UI automatically.")
-        Toggle("Kiosk mode (screen pinning / lock task)", s.kiosk, { v -> upd { it.copy(kiosk = v) } }, "Full kiosk: adb shell dpm set-device-owner org.kineticos.app/.service.KioskAdminReceiver on a reset phone (INSTALL.md). Otherwise Android screen pinning is used.")
-        Toggle("Auto-record rides", s.autoRecord, { v -> upd { it.copy(autoRecord = v) } })
-        Toggle("Power saver", s.powerSaver, { v -> upd { it.copy(powerSaver = v) } }, "Telemetry ≤ 4 Hz, telematics every 30 s")
-        LabeledSlider("Telemetry poll rate", s.pollHz.toFloat(), { v -> upd { it.copy(pollHz = v.toInt()) } }, 1f..50f, { "%.0f Hz".format(it) })
-        Text("The app adapts the rate down automatically if the link cannot keep up (BLE typically 10–20 Hz).", color = p.textDim, style = labelStyle(10))
-        BigButton("BATTERY OPTIMISATION EXCEPTION", Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Toggle(stringResource(R.string.set_voice), s.voiceAlerts, { v -> upd { it.copy(voiceAlerts = v) } }, stringResource(R.string.set_voice_sub))
+        Toggle(stringResource(R.string.set_vibrate), s.vibrateAlerts, { v -> upd { it.copy(vibrateAlerts = v) } })
+        Toggle(stringResource(R.string.set_pip), s.pipOnLeave, { v -> upd { it.copy(pipOnLeave = v) } }, stringResource(R.string.set_pip_sub))
+        Toggle(stringResource(R.string.set_glove), s.gloveMode, { v -> upd { it.copy(gloveMode = v) } })
+        Toggle(stringResource(R.string.set_keep_on), s.keepScreenOn, { v -> upd { it.copy(keepScreenOn = v) } })
+        LabeledSlider(stringResource(R.string.set_dim), s.dimAfterIdleS.toFloat(), { v -> upd { it.copy(dimAfterIdleS = v.toInt()) } }, 0f..600f, { if (it < 1) offText else "%.0f s".format(it) })
+        SectionTitle(stringResource(R.string.set_cockpit))
+        Toggle(stringResource(R.string.set_boot), s.autoStartOnBoot, { v -> upd { it.copy(autoStartOnBoot = v) } }, stringResource(R.string.set_boot_sub))
+        Toggle(stringResource(R.string.set_kiosk), s.kiosk, { v -> upd { it.copy(kiosk = v) } }, stringResource(R.string.set_kiosk_sub))
+        Toggle(stringResource(R.string.set_autorec), s.autoRecord, { v -> upd { it.copy(autoRecord = v) } })
+        Toggle(stringResource(R.string.set_saver), s.powerSaver, { v -> upd { it.copy(powerSaver = v) } }, stringResource(R.string.set_saver_sub))
+        LabeledSlider(stringResource(R.string.set_poll), s.pollHz.toFloat(), { v -> upd { it.copy(pollHz = v.toInt()) } }, 1f..50f, { "%.0f Hz".format(it) })
+        Text(stringResource(R.string.set_poll_hint), color = p.textDim, style = labelStyle(10))
+        BigButton(stringResource(R.string.set_battopt), Modifier.fillMaxWidth().padding(top = 6.dp)) {
             val pm = ctx.getSystemService(PowerManager::class.java)
-            if (pm.isIgnoringBatteryOptimizations(ctx.packageName)) g.toast("Already excluded")
+            if (pm.isIgnoringBatteryOptimizations(ctx.packageName)) g.toast(ctx.getString(R.string.set_already_excluded))
             else runCatching { ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))) }
         }
-        Text("Samsung: also set Settings → Battery → Background usage limits → Never sleeping apps → Kinetic OS.", color = p.textDim, style = labelStyle(10))
-        SectionTitle("Maps")
-        Field("Day style URL", s.mapStyleDay, { v -> upd { it.copy(mapStyleDay = v) } }, Modifier.fillMaxWidth())
-        Field("Night style URL", s.mapStyleNight, { v -> upd { it.copy(mapStyleNight = v) } }, Modifier.fillMaxWidth())
-        Text("Default: OpenFreeMap (OpenStreetMap data © OpenStreetMap contributors, ODbL). Respect the tile provider's terms for offline downloads.", color = p.textDim, style = labelStyle(10))
-        SectionTitle("Account (self-hosted server)")
-        Field("Server URL (https://…)", server, { server = it }, Modifier.fillMaxWidth())
-        Field("Username", user, { user = it }, Modifier.fillMaxWidth())
-        Field("Password", pass, { pass = it }, Modifier.fillMaxWidth(), password = true)
-        Field("Display name (register only)", display, { display = it }, Modifier.fillMaxWidth())
+        Text(stringResource(R.string.set_samsung), color = p.textDim, style = labelStyle(10))
+        SectionTitle(stringResource(R.string.set_maps))
+        Field(stringResource(R.string.set_map_day), s.mapStyleDay, { v -> upd { it.copy(mapStyleDay = v) } }, Modifier.fillMaxWidth())
+        Field(stringResource(R.string.set_map_night), s.mapStyleNight, { v -> upd { it.copy(mapStyleNight = v) } }, Modifier.fillMaxWidth())
+        Text(stringResource(R.string.set_map_hint), color = p.textDim, style = labelStyle(10))
+        SectionTitle(stringResource(R.string.set_account))
+        Field(stringResource(R.string.set_server_url), server, { server = it }, Modifier.fillMaxWidth())
+        Field(stringResource(R.string.set_username), user, { user = it }, Modifier.fillMaxWidth())
+        Field(stringResource(R.string.set_password), pass, { pass = it }, Modifier.fillMaxWidth(), password = true)
+        Field(stringResource(R.string.set_display_name), display, { display = it }, Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            BigButton("LOGIN", Modifier.weight(1f)) { scope.launch {
+            BigButton(stringResource(R.string.set_login), Modifier.weight(1f)) { scope.launch {
                 g.settingsRepo.update { it.copy(serverUrl = server) }
-                runCatching { g.api.login(user, pass) }.onSuccess { r -> g.settingsRepo.update { it.copy(authToken = r.token, username = r.user.username) }; msg = "Logged in as ${r.user.displayName}"; pass = "" }.onFailure { msg = "Login failed: ${it.message}" }
+                runCatching { g.api.login(user, pass) }.onSuccess { r -> g.settingsRepo.update { it.copy(authToken = r.token, username = r.user.username) }; msg = ctx.getString(R.string.set_logged_in, r.user.displayName); pass = "" }.onFailure { msg = ctx.getString(R.string.set_login_failed, it.message) }
             } }
-            BigButton("REGISTER", Modifier.weight(1f)) { scope.launch {
+            BigButton(stringResource(R.string.set_register), Modifier.weight(1f)) { scope.launch {
                 g.settingsRepo.update { it.copy(serverUrl = server) }
-                runCatching { g.api.register(user, pass, display.ifBlank { user }) }.onSuccess { r -> g.settingsRepo.update { it.copy(authToken = r.token, username = r.user.username) }; msg = "Registered"; pass = "" }.onFailure { msg = "Register failed: ${it.message}" }
+                runCatching { g.api.register(user, pass, display.ifBlank { user }) }.onSuccess { r -> g.settingsRepo.update { it.copy(authToken = r.token, username = r.user.username) }; msg = ctx.getString(R.string.set_registered); pass = "" }.onFailure { msg = ctx.getString(R.string.set_register_failed, it.message) }
             } }
-            BigButton("LOGOUT", Modifier.weight(1f), color = K.Danger) { upd { it.copy(authToken = null) }; g.socket.stop(); msg = "Logged out" }
+            BigButton(stringResource(R.string.set_logout), Modifier.weight(1f), color = K.Danger) { upd { it.copy(authToken = null) }; g.socket.stop(); msg = ctx.getString(R.string.set_logged_out) }
         }
         msg?.let { Text(it, color = K.Accent) }
-        Text(if (s.authToken != null) "Signed in as ${s.username}" else "Not signed in", color = p.textDim)
-        SectionTitle("About")
-        Text("Kinetic OS ${BuildConfig.VERSION_NAME} – independent open cockpit for VESC vehicles. Not affiliated with, endorsed by or compatible with Stark Future. VESC is a trademark of Benjamin Vedder.", color = p.textDim, style = labelStyle(10))
+        Text(if (s.authToken != null) stringResource(R.string.set_signed_in, s.username ?: "") else stringResource(R.string.set_not_signed_in), color = p.textDim)
+        SectionTitle(stringResource(R.string.set_about))
+        Text(stringResource(R.string.set_about_text, BuildConfig.VERSION_NAME), color = p.textDim, style = labelStyle(10))
     }
 }

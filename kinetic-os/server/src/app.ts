@@ -30,7 +30,8 @@ declare module 'fastify' {
 export async function buildApp(pool: Pool, config: Config): Promise<{ app: FastifyInstance; hub: Hub }> {
   const hub = new Hub();
   const ctx: Ctx = { pool, config, hub };
-  const app = fastify({ logger: process.env.NODE_ENV !== 'test', trustProxy: config.trustProxy, bodyLimit: 2 * 1024 * 1024 });
+  // Never log query strings: the WebSocket handshake carries the JWT as ?token=…
+  const app = fastify({ logger: process.env.NODE_ENV !== 'test' ? { serializers: { req: (r: { method: string; url: string }) => ({ method: r.method, url: r.url.split('?')[0] }) } } : false, trustProxy: config.trustProxy, bodyLimit: 2 * 1024 * 1024 });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) return reply.code(err.statusCode).send({ error: err.code, message: err.message });

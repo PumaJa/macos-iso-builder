@@ -33,6 +33,13 @@ class UsbVescTransport(private val context: Context, val device: UsbDevice, priv
         if (!mgr.hasPermission(device)) throw SecurityException("USB permission not granted")
         _state.value = LinkState.Connecting
         val c = mgr.openDevice(device) ?: throw IllegalStateException("Cannot open USB device")
+        try { setup(c, mgr) } catch (e: Exception) {
+            ifaces.forEach { runCatching { c.releaseInterface(it) } }; c.close(); ifaces = emptyList()   // no leak on failed setup
+            _state.value = LinkState.Failed(e.message ?: "USB setup failed"); throw e
+        }
+    }
+
+    private fun setup(c: UsbDeviceConnection, mgr: UsbManager) {
         var control: UsbInterface? = null; var data: UsbInterface? = null
         for (i in 0 until device.interfaceCount) {
             val itf = device.getInterface(i)

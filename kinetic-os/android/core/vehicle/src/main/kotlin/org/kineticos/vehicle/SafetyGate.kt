@@ -19,7 +19,8 @@ data class LiveState(
 )
 
 sealed interface GateDecision {
-    data class Allowed(val payload: ByteArray, val token: WriteToken, val summary: String, val warnings: List<String>) : GateDecision
+    /** [effective] = what the controller will actually run (may differ from the request, e.g. regen held while moving). */
+    data class Allowed(val payload: ByteArray, val token: WriteToken, val summary: String, val warnings: List<String>, val effective: RideProfile? = null) : GateDecision
     data class Denied(val reasons: List<String>) : GateDecision
 }
 
@@ -40,26 +41,38 @@ class SafetyGate(
     fun firmwareSupported(fw: FirmwareInfo): Boolean = fw.atLeast(5, 3) && fw.major <= 7
 
     fun planRideMode(
-        fw: FirmwareInfo?, backup: McConfBackup?, current: RideProfile?, target: RideProfile, vehicle: VehicleProfile,
+        fw: FirmwareInfo?, backup: McConfBackup?, current: RideProfile?, requested: RideProfile, vehicle: VehicleProfile,
         live: LiveState, deratingFactor: Double = 1.0,
     ): GateDecision {
+        val cur = current ?: STOCK
+        val speedNow = live.speedKmh ?: live.erpm?.let { abs(it) * vehicle.kmhPerKiloErpm / 1000 }
+        val moving = speedNow == null || speedNow > stationaryKmh
+        // While moving, a mode change may reduce drive power, but never increase regen braking or reverse speed:
+        // those parts are held at the current values and apply at the next standstill.
+        val target = if (moving) requested.copy(
+            regenFraction = minOf(requested.regenFraction, cur.regenFraction),
+            reverseSpeedLimitKmh = listOfNotNull(requested.reverseSpeedLimitKmh, cur.reverseSpeedLimitKmh).minOrNull(),
+        ) else requested
         val reasons = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         if (fw == null) reasons += "Firmware not identified"
         else if (!firmwareSupported(fw)) reasons += "Firmware ${fw.versionString} not on verified list (5.03–7.x)"
         if (backup == null) reasons += "No configuration backup for this controller"
+        else if (backup.vescUuid.isBlank() || (fw != null && fw.uuidHex.isBlank())) reasons += "Controller did not report a UUID – cannot bind the backup safely"
         else if (fw != null && backup.vescUuid != fw.uuidHex) reasons += "Backup belongs to a different controller"
         if (!live.linkHealthy) reasons += "Link unstable"
         if (live.faultCode != 0) reasons += "Controller reports fault ${live.faultCode}"
         if (target.virtualFlywheel > 0 || target.tractionControl > 0 || target.wheelieControl > 0)
             reasons += "Virtual flywheel / traction / wheelie control need hardware validation and are not enabled for riding"
         listOf(target.powerFraction, target.motorCurrentFraction, target.batteryCurrentFraction, target.regenFraction).forEach {
-            if (it !in 0.0..1.0) reasons += "Profile fraction $it outside 0..1"
+            if (it.isNaN() || it !in 0.0..1.0) reasons += "Profile fraction $it outside 0..1"
         }
+        target.speedLimitKmh?.let { if (!it.isFinite() || it <= 0 || it > 400) reasons += "Speed limit $it km/h invalid" }
+        target.reverseSpeedLimitKmh?.let { if (!it.isFinite() || it < 0 || it > 100) reasons += "Reverse limit $it km/h invalid" }
+        backup?.conf?.let { c -> if (listOf(c.wattMax, c.inCurrentMax, c.maxErpm, c.currentMaxScale).any { !it.isFinite() }) reasons += "Backup contains invalid values" }
         // No mode applied yet = controller runs its stored (stock) limits, i.e. the most powerful state.
-        val raising = isMorePowerful(target, current ?: STOCK)
-        val speed = live.speedKmh ?: live.erpm?.let { abs(it) * vehicle.kmhPerKiloErpm / 1000 }
-        if (raising && (speed == null || speed > stationaryKmh))
+        val raising = isMorePowerful(target, cur)
+        if (raising && moving)
             reasons += "Increasing power is only allowed at standstill (< ${stationaryKmh} km/h)"
         if (reasons.isNotEmpty() || backup == null) return GateDecision.Denied(reasons)
 
@@ -71,12 +84,13 @@ class SafetyGate(
         val inMax = b.inCurrentMax * target.batteryCurrentFraction * d
         val inMin = b.inCurrentMin * target.regenFraction
         // speed limits in m/s; derive backup's speed ceiling from its own pole/gear/wheel setup
-        val fact = (b.motorPoles / 2.0) * 60.0 * b.gearRatio / (b.wheelDiameterM * PI)
+        val fact = if (b.wheelDiameterM > 0 && b.gearRatio > 0 && b.motorPoles > 0) (b.motorPoles / 2.0) * 60.0 * b.gearRatio / (b.wheelDiameterM * PI) else 0.0
         val backupMaxMps = if (fact > 0) b.maxErpm / fact else Double.MAX_VALUE
         val backupMinMps = if (fact > 0) b.minErpm / fact else -Double.MAX_VALUE
         val maxMps = min(backupMaxMps, target.speedLimitKmh?.div(3.6) ?: backupMaxMps)
         val minMps = maxOf(backupMinMps, target.reverseSpeedLimitKmh?.let { -it / 3.6 } ?: backupMinMps)
         if (fact <= 0) warnings += "Controller has no wheel/gear setup (si_*) – speed limit not applied"
+        if (target.regenFraction < requested.regenFraction) warnings += "Stronger regen of ${requested.name} applies at the next standstill"
         if (target.engineBrakeFraction > 0) warnings += "Engine brake needs the LispBM throttle script; not applied by this write"
         if (target.character.approximate) warnings += "${target.character.label} is an approximation, not a validated engine model"
 
@@ -91,22 +105,27 @@ class SafetyGate(
         )
         val summary = "%s: motor %.0f%%, power %.1f kW, battery %.0f A, Vmax %s".format(
             target.name, maxScale * 100, wattMax / 1000, inMax, target.speedLimitKmh?.let { "%.0f km/h".format(it) } ?: "stock")
-        return GateDecision.Allowed(payload, WriteToken.issue("SafetyGate", summary), summary, warnings)
+        return GateDecision.Allowed(payload, WriteToken.issue("SafetyGate", summary), summary, warnings, target)
     }
 
-    /** Restore exactly the backed-up limits (always allowed when link is healthy – it can only restore stock). */
-    fun planRestore(backup: McConfBackup, live: LiveState): GateDecision {
+    /** Restore exactly the backed-up limits. Restoring is a power *increase* from any reduced mode → standstill only. */
+    fun planRestore(backup: McConfBackup, live: LiveState, vehicle: VehicleProfile? = null): GateDecision {
         if (!live.linkHealthy) return GateDecision.Denied(listOf("Link unstable"))
+        if (live.faultCode != 0) return GateDecision.Denied(listOf("Controller reports fault ${live.faultCode}"))
+        val speed = live.speedKmh ?: vehicle?.let { v -> live.erpm?.let { abs(it) * v.kmhPerKiloErpm / 1000 } }
+        if (speed == null || speed > stationaryKmh) return GateDecision.Denied(listOf("Restoring stock power is only allowed at standstill (< ${stationaryKmh} km/h)"))
         val b = backup.conf
         val p = Commands.setMcConfTemp(b.currentMinScale, b.currentMaxScale, b.minErpm, b.maxErpm, b.minDuty, b.maxDuty,
             b.wattMin, b.wattMax, b.inCurrentMin, b.inCurrentMax, store = false)
         return GateDecision.Allowed(p, WriteToken.issue("SafetyGate", "restore backup"), "Restore stored limits", emptyList())
     }
 
+    /** Any increase of drive torque/power/speed, regen braking force or reverse speed counts as "more powerful". */
     fun isMorePowerful(a: RideProfile, b: RideProfile): Boolean =
         a.powerFraction > b.powerFraction || a.motorCurrentFraction > b.motorCurrentFraction ||
-            a.batteryCurrentFraction > b.batteryCurrentFraction ||
-            (a.speedLimitKmh ?: Double.MAX_VALUE) > (b.speedLimitKmh ?: Double.MAX_VALUE)
+            a.batteryCurrentFraction > b.batteryCurrentFraction || a.regenFraction > b.regenFraction ||
+            (a.speedLimitKmh ?: Double.MAX_VALUE) > (b.speedLimitKmh ?: Double.MAX_VALUE) ||
+            (a.reverseSpeedLimitKmh ?: Double.MAX_VALUE) > (b.reverseSpeedLimitKmh ?: Double.MAX_VALUE)
 
     companion object { val STOCK = RideProfile("stock", "STOCK", builtIn = true) }
 

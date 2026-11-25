@@ -1,4 +1,6 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
 
 import android.app.PendingIntent
 import android.content.Intent
@@ -31,50 +33,52 @@ fun ConnectScreen() {
     var host by remember { mutableStateOf("192.168.4.1:65102") }
     val scope = rememberCoroutineScope()
     DisposableEffect(Unit) { onDispose { scanJob?.cancel() } }
+    val scanFailedText = stringResource(R.string.conn_scan_failed)
+    val usbNoneText = stringResource(R.string.conn_usb_none)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        SectionTitle("Connection")
+        SectionTitle(stringResource(R.string.conn_section))
         Card(Modifier.fillMaxWidth()) {
             Text(when (val s = status) {
-                is ConnStatus.Online -> "Online: ${s.description}"; is ConnStatus.Connecting -> "Connecting (${s.target}), attempt ${s.attempt}"
-                is ConnStatus.Reconnecting -> "Lost link – retry ${s.attempt} in ${s.inMs / 1000}s"; is ConnStatus.Error -> s.message; ConnStatus.Idle -> "Not connected"
+                is ConnStatus.Online -> stringResource(R.string.conn_online, s.description); is ConnStatus.Connecting -> stringResource(R.string.conn_connecting, s.target, s.attempt)
+                is ConnStatus.Reconnecting -> stringResource(R.string.conn_reconnecting, s.attempt, s.inMs / 1000); is ConnStatus.Error -> s.message; ConnStatus.Idle -> stringResource(R.string.conn_idle)
             }, color = p.text)
-            Text("Last: ${settings.lastTransport ?: "—"}", color = p.textDim)
-            Toggle("Auto-connect on start", settings.autoConnect, { v -> scope.launch { g.settingsRepo.update { it.copy(autoConnect = v) } } })
-            BigButton("DISCONNECT", Modifier.fillMaxWidth(), color = K.Danger) { g.disconnect() }
-            if (status is ConnStatus.Online) Text("Tip: More → VESC Setup checks the controller configuration.", color = p.textDim, style = labelStyle(10))
+            Text(stringResource(R.string.conn_last, settings.lastTransport ?: "—"), color = p.textDim)
+            Toggle(stringResource(R.string.conn_autoconnect), settings.autoConnect, { v -> scope.launch { g.settingsRepo.update { it.copy(autoConnect = v) } } })
+            BigButton(stringResource(R.string.conn_disconnect), Modifier.fillMaxWidth(), color = K.Danger) { g.disconnect() }
+            if (status is ConnStatus.Online) Text(stringResource(R.string.conn_tip), color = p.textDim, style = labelStyle(10))
         }
         SectionTitle("Bluetooth LE")
-        BigButton(if (scanJob == null) "SCAN" else "STOP SCAN", Modifier.fillMaxWidth(), selected = scanJob != null) {
+        BigButton(stringResource(if (scanJob == null) R.string.conn_scan else R.string.conn_stop_scan), Modifier.fillMaxWidth(), selected = scanJob != null) {
             if (scanJob != null) { scanJob?.cancel(); scanJob = null }
-            else { found.clear(); scanJob = scope.launch { runCatching { BleScanner(ctx).scan().collect { found[it.address] = it } }.onFailure { g.toast(it.message ?: "scan failed") }; scanJob = null } }
+            else { found.clear(); scanJob = scope.launch { runCatching { BleScanner(ctx).scan().collect { found[it.address] = it } }.onFailure { g.toast(it.message ?: scanFailedText) }; scanJob = null } }
         }
         found.values.sortedWith(compareByDescending<FoundDevice> { it.advertisesNus }.thenByDescending { it.rssi }).forEach { d ->
             Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text((d.name ?: "Unknown") + if (d.advertisesNus) "  · VESC/UART" else "", color = if (d.advertisesNus) K.Accent else p.text)
+                    Text((d.name ?: stringResource(R.string.conn_unknown)) + if (d.advertisesNus) "  · VESC/UART" else "", color = if (d.advertisesNus) K.Accent else p.text)
                     Text("${d.address} · ${d.rssi} dBm", color = p.textDim, style = labelStyle(10))
                 }
-                BigButton("CONNECT") { scanJob?.cancel(); scanJob = null; g.connectTo("ble:${d.address}") }
+                BigButton(stringResource(R.string.conn_connect)) { scanJob?.cancel(); scanJob = null; g.connectTo("ble:${d.address}") }
             }
         }
         SectionTitle("USB-OTG")
-        BigButton("CONNECT USB VESC", Modifier.fillMaxWidth()) {
+        BigButton(stringResource(R.string.conn_usb_connect), Modifier.fillMaxWidth()) {
             val um = ctx.getSystemService(UsbManager::class.java); val dev = g.findUsb()
             when {
-                dev == null -> g.toast("No CDC-ACM VESC attached (OTG cable?)")
+                dev == null -> g.toast(usbNoneText)
                 !um.hasPermission(dev) -> um.requestPermission(dev, PendingIntent.getBroadcast(ctx, 0, Intent("org.kineticos.USB_PERMISSION").setPackage(ctx.packageName), PendingIntent.FLAG_IMMUTABLE))
                 else -> g.connectTo("usb")
             }
         }
-        Text("After granting USB permission tap again.", color = p.textDim, style = labelStyle(10))
-        SectionTitle("WiFi / TCP (VESC Express, VESC Tool bridge)")
+        Text(stringResource(R.string.conn_usb_again), color = p.textDim, style = labelStyle(10))
+        SectionTitle(stringResource(R.string.conn_wifi_section))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field("host:port", host, { host = it }, Modifier.weight(1f)); BigButton("CONNECT") { g.connectTo("tcp:$host") }
+            Field("host:port", host, { host = it }, Modifier.weight(1f)); BigButton(stringResource(R.string.conn_connect)) { g.connectTo("tcp:$host") }
         }
-        SectionTitle("Simulation")
-        Text("Starts a virtual VESC for testing. All data is marked SIMULATION and is never sent as real telematics.", color = p.textDim)
-        BigButton("START SIMULATOR", Modifier.fillMaxWidth(), color = K.Sim) { g.connectTo("sim") }
-        BigButton("SIMULATOR + VEHICLE SCRIPT", Modifier.fillMaxWidth().padding(top = 6.dp), color = K.Sim) { g.connectTo("sim-script") }
+        SectionTitle(stringResource(R.string.conn_sim_section))
+        Text(stringResource(R.string.conn_sim_text), color = p.textDim)
+        BigButton(stringResource(R.string.conn_sim_start), Modifier.fillMaxWidth(), color = K.Sim) { g.connectTo("sim") }
+        BigButton(stringResource(R.string.conn_sim_script), Modifier.fillMaxWidth().padding(top = 6.dp), color = K.Sim) { g.connectTo("sim-script") }
     }
 }

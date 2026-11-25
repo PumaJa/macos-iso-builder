@@ -152,3 +152,15 @@ class WarningEngineTest {
         w.linkRestored(); kotlin.test.assertNotNull(w.linkLost(2, 30.0, false))
     }
 }
+
+class TelemetryEdgeCaseTest {
+    @kotlin.test.Test fun staleGpsAndBadVoltageAreRejected() {
+        val dt = Drivetrain(7, 8.0, 0.5, batteryCellsSeries = 20, batteryCapacityAh = 20.0, batteryNominalV = 72.0)
+        val stale = TelemetryEngine(dt.copy(configured = false), false).process(10_000, null, GpsFix(47.0, 8.0, null, 0.0, null, 5.0, 0), null, null)
+        kotlin.test.assertFalse(stale.speedMps.isAvailable) // 10 s old fix → not used (could fake "standstill")
+        val v = org.kineticos.vesc.model.VescValues(30.0, 30.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.NaN, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, null, null, null, null, null, null, null, null)
+        val s = TelemetryEngine(dt, false).process(0, v, null, null, null) // must not throw
+        kotlin.test.assertFalse(s.socPct.isAvailable)
+        kotlin.test.assertEquals(0.0, Calc.socFromCellVoltage(Double.NaN))
+    }
+}

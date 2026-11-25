@@ -1,4 +1,8 @@
 package org.kineticos.app.ui.screens
+import androidx.compose.ui.res.stringResource
+import org.kineticos.app.R
+import org.kineticos.vehicle.MotorCharacter
+import org.kineticos.vehicle.VehicleType
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,3 +41,16 @@ fun Toggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit, sub: St
 }
 
 fun String.toD() = replace(',', '.').toDoubleOrNull()
+
+@Composable
+fun VehicleType.uiLabel(): String = stringResource(when (this) {
+    VehicleType.E_MOTORCYCLE -> R.string.vt_motorcycle; VehicleType.E_MOTOCROSS -> R.string.vt_motocross; VehicleType.E_BIKE -> R.string.vt_bike
+    VehicleType.E_SCOOTER -> R.string.vt_scooter; VehicleType.E_KART -> R.string.vt_kart; VehicleType.CUSTOM_BUILD -> R.string.vt_custom
+    VehicleType.RC -> R.string.vt_rc; VehicleType.MULTI_MOTOR -> R.string.vt_multi
+})
+
+@Composable
+fun MotorCharacter.uiLabel(): String = stringResource(when (this) {
+    MotorCharacter.ELECTRIC_LINEAR -> R.string.mc_electric; MotorCharacter.TWO_STROKE_125 -> R.string.mc_2s125; MotorCharacter.TWO_STROKE_250 -> R.string.mc_2s250
+    MotorCharacter.FOUR_STROKE_250 -> R.string.mc_4s250; MotorCharacter.FOUR_STROKE_450 -> R.string.mc_4s450; MotorCharacter.CUSTOM -> R.string.mc_custom
+})
