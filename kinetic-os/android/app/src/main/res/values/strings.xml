@@ -528,4 +528,5 @@
     <string name="map_downloading">Downloading visible area…</string>
     <string name="map_offline_err">Offline: %1$s</string>
     <string name="dash_speed_source_none">no source</string>
+    <string name="edit_curve_points_hint">Drag the points to shape the throttle response (left = little throttle, right = full throttle).</string>
 </resources>

@@ -107,3 +107,16 @@ class SafetyGateTest {
         assertTrue(VehicleValidator.validate(vehicle.copy(batteryCellsSeries = 20, batteryNominalV = 200.0)).any { !it.blocking })
     }
 }
+
+class CurveEditorTest {
+    @Test fun editingKeepsCurveValid() {
+        val c = ThrottleCurve.LINEAR.resample(6)                     // 0, .2, .4, .6, .8, 1
+        assertEquals(6, c.points.size)
+        val up = c.withPoint(2, 0.9)                                  // later points pushed up, never below
+        assertEquals(listOf(0.0, 0.2, 0.9, 0.9, 0.9, 1.0), up.points.map { Math.round(it * 100) / 100.0 })
+        val down = c.withPoint(4, 0.1)                                // earlier points pulled down
+        assertEquals(listOf(0.0, 0.1, 0.1, 0.1, 0.1, 1.0), down.points.map { Math.round(it * 100) / 100.0 })
+        assertEquals(0.0, c.withPoint(0, 0.8).points[0])              // closed throttle always 0
+        assertEquals(1.0, c.withPoint(3, 7.0).points[3])              // clamped
+    }
+}

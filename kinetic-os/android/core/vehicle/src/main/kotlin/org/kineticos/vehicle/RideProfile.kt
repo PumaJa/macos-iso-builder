@@ -36,6 +36,22 @@ data class ThrottleCurve(val points: List<Double>) {
         fun expo(e: Double, n: Int = 11) = ThrottleCurve(List(n) { (it / (n - 1.0)).pow(e) })
         val LINEAR = expo(1.0)
     }
+
+    /** Resample to [n] evenly spaced points (for the point editor). */
+    fun resample(n: Int): ThrottleCurve = ThrottleCurve(List(n) { map(it / (n - 1.0)) })
+
+    /**
+     * Moves point [index] to [value] while keeping the curve valid: point 0 stays 0 (no torque at closed throttle),
+     * values stay in 0..1 and the curve stays monotonic – neighbours are pushed along instead of being crossed.
+     */
+    fun withPoint(index: Int, value: Double): ThrottleCurve {
+        if (index == 0) return this
+        val v = value.coerceIn(0.0, 1.0)
+        val p = points.toMutableList(); p[index] = v
+        for (i in index + 1 until p.size) if (p[i] < v) p[i] = v
+        for (i in index - 1 downTo 1) if (p[i] > v) p[i] = v
+        return ThrottleCurve(p)
+    }
 }
 
 /**

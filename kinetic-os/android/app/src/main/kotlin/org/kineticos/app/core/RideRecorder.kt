@@ -1,6 +1,7 @@
 package org.kineticos.app.core
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
 import org.kineticos.app.data.*
@@ -15,6 +16,8 @@ import java.util.UUID
 class RideRecorder(private val db: KineticDb, private val scope: CoroutineScope, private val resumeWindowMs: Long = 30 * 60_000) {
     private val _active = MutableStateFlow<RideEntity?>(null); val active: StateFlow<RideEntity?> = _active
     private val buffer = ArrayList<SampleEntity>()
+    private val writeMutex = kotlinx.coroutines.sync.Mutex()
+    private val inflight = ArrayList<Job>()
     private var lastSampleT = 0L
     private var minIntervalMs = 100L
 
@@ -36,10 +39,19 @@ class RideRecorder(private val db: KineticDb, private val scope: CoroutineScope,
         if (s.t - lastSampleT < minIntervalMs) return
         lastSampleT = s.t
         synchronized(buffer) { buffer += SampleEntity(rideId = r.id, t = s.t, json = AppJson.encodeToString(s)) }
-        if (buffer.size >= 50) scope.launch { flush() }
+        if (synchronized(buffer) { buffer.size } >= 50) {
+            val j = scope.launch { flushBuffered() }
+            synchronized(inflight) { inflight.removeAll { it.isCompleted }; inflight += j }
+        }
     }
 
+    /** Writes everything offered so far – waits for background batch writes, so callers see all samples. */
     suspend fun flush() {
+        synchronized(inflight) { inflight.toList() }.forEach { it.join() }
+        flushBuffered()
+    }
+
+    private suspend fun flushBuffered() = writeMutex.withLock {
         val batch = synchronized(buffer) { buffer.toList().also { buffer.clear() } }
         if (batch.isNotEmpty()) {
             db.rides().insertSamples(batch)

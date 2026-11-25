@@ -528,4 +528,5 @@
     <string name="map_downloading">Lade sichtbares Gebiet…</string>
     <string name="map_offline_err">Offline: %1$s</string>
     <string name="dash_speed_source_none">keine Quelle</string>
+    <string name="edit_curve_points_hint">Punkte ziehen, um die Gasannahme zu formen (links = wenig Gas, rechts = Vollgas).</string>
 </resources>

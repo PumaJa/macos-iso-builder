@@ -3,6 +3,9 @@ import androidx.compose.ui.res.stringResource
 import org.kineticos.app.R
 
 import androidx.compose.foundation.Canvas
+import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -113,7 +116,8 @@ private fun ProfileEditor(initial: RideProfile, onDone: (RideProfile?) -> Unit) 
                 MotorCharacter.entries.drop(3).forEach { c -> BigButton(c.uiLabel(), Modifier.weight(1f), selected = pr.character == c) { pr = pr.copy(character = c, throttleCurve = CharacterMaps.defaultCurve(c)) } }
             }
             LabeledSlider(stringResource(R.string.edit_expo), curveExpo, { curveExpo = it; pr = pr.copy(throttleCurve = ThrottleCurve.expo(it.toDouble()), character = if (pr.character.approximate) pr.character else MotorCharacter.CUSTOM) }, 0.4f..3f, { "%.2f".format(it) })
-            CurvePreview(pr, Modifier.fillMaxWidth().height(120.dp))
+            Text(stringResource(R.string.edit_curve_points_hint), color = p.textDim, style = labelStyle(10))
+            CurveEditor(pr.throttleCurve, Modifier.fillMaxWidth().height(180.dp)) { c -> pr = pr.copy(throttleCurve = c, character = if (pr.character.approximate) MotorCharacter.CUSTOM else pr.character) }
             SectionTitle(stringResource(R.string.edit_assist))
             Text(stringResource(R.string.edit_assist_hint), color = p.textDim, style = labelStyle(10))
             LabeledSlider(stringResource(R.string.edit_flywheel), 0f, {}, enabled = false); LabeledSlider(stringResource(R.string.edit_traction), 0f, {}, enabled = false); LabeledSlider(stringResource(R.string.edit_wheelie), 0f, {}, enabled = false)
@@ -124,5 +128,32 @@ private fun ProfileEditor(initial: RideProfile, onDone: (RideProfile?) -> Unit) 
                 BigButton(stringResource(R.string.btn_save), Modifier.weight(1f), selected = true) { onDone(pr) }
             }
         }
+    }
+}
+
+/** Drag the points of the throttle curve (6 points; closed throttle fixed at 0, curve stays monotonic). */
+@Composable
+fun CurveEditor(curve: ThrottleCurve, modifier: Modifier, onChange: (ThrottleCurve) -> Unit) {
+    val p = LocalPalette.current
+    val c6 = remember(curve) { if (curve.points.size == 6) curve else curve.resample(6) }
+    var dragging by remember { mutableIntStateOf(-1) }
+    Canvas(modifier.pointerInput(c6) {
+        detectDragGestures(
+            onDragStart = { o ->
+                val i = ((o.x / size.width) * 5).roundToInt().coerceIn(1, 5)
+                dragging = i
+            },
+            onDragEnd = { dragging = -1 }, onDragCancel = { dragging = -1 },
+        ) { change, _ ->
+            val i = dragging; if (i < 1) return@detectDragGestures
+            val v = 1.0 - (change.position.y / size.height).toDouble()
+            onChange(c6.withPoint(i, v))
+        }
+    }) {
+        for (k in 0..4) { val y = size.height * k / 4; drawLine(p.grid, Offset(0f, y), Offset(size.width, y), 1f) }
+        val pts = c6.points.mapIndexed { i, v -> Offset(size.width * i / 5f, size.height * (1 - v.toFloat())) }
+        val path = Path().apply { moveTo(pts[0].x, pts[0].y); pts.drop(1).forEach { lineTo(it.x, it.y) } }
+        drawPath(path, K.Accent, style = Stroke(4f))
+        pts.forEachIndexed { i, o -> drawCircle(if (i == dragging) K.Warn else K.Accent, if (i == 0) 8f else 16f, o) }
     }
 }

@@ -3,6 +3,8 @@ import androidx.compose.ui.res.stringResource
 import org.kineticos.app.R
 
 import androidx.compose.foundation.Image
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -87,7 +89,19 @@ fun DashScreen(go: (Screen) -> Unit) {
                 BigButton(stringResource(R.string.dash_connect), Modifier.fillMaxWidth()) { go(Screen.CONNECT) }
             }
         }
-        val main: @Composable (Modifier) -> Unit = { m ->
+        // Swipe left/right over the gauge = next/previous ride mode (same SafetyGate rules as every other mode change)
+        val swipeMod = Modifier.pointerInput(profiles) {
+            var acc = 0f
+            detectHorizontalDragGestures(onDragStart = { acc = 0f }, onDragEnd = {
+                if (kotlin.math.abs(acc) > size.width * 0.25f && profiles.isNotEmpty()) {
+                    val cur = profiles.indexOfFirst { it.id == applied?.id }.let { if (it < 0) profiles.size - 1 else it }
+                    val next = profiles[(cur + if (acc < 0) 1 else profiles.size - 1) % profiles.size]
+                    scope.launch { g.toast(g.applyProfile(next)) }
+                }
+            }) { _, dx -> acc += dx }
+        }
+        val main: @Composable (Modifier) -> Unit = { m0 ->
+            val m = m0.then(swipeMod)
             Column(m, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.fillMaxWidth(0.95f).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
                     PowerArc((kotlin.math.abs(pw) / maxP).toFloat(), pw < 0, Modifier.fillMaxSize(), simulated)
