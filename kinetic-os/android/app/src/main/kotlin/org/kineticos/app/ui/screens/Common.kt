@@ -27,7 +27,7 @@ fun LabeledSlider(label: String, value: Float, onChange: (Float) -> Unit, range:
     val p = LocalPalette.current
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row { Text(label, color = if (enabled) p.text else p.textDim, modifier = Modifier.weight(1f)); Text(display(value), color = K.Accent, style = labelStyle(13)) }
-        Slider(value, onChange, valueRange = range, enabled = enabled, colors = SliderDefaults.colors(thumbColor = K.Accent, activeTrackColor = K.Accent))
+        Slider(value, onChange, valueRange = range, enabled = enabled, colors = SliderDefaults.colors(thumbColor = K.Accent, activeTrackColor = K.Accent, inactiveTrackColor = p.surface2, activeTickColor = K.OnAccent, inactiveTickColor = p.textDim))
     }
 }
 
@@ -36,7 +36,7 @@ fun Toggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit, sub: St
     val p = LocalPalette.current
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) { Text(label, color = p.text); sub?.let { Text(it, color = p.textDim, style = labelStyle(10)) } }
-        Switch(checked, onChange, colors = SwitchDefaults.colors(checkedTrackColor = K.Accent))
+        Switch(checked, onChange, colors = SwitchDefaults.colors(checkedTrackColor = K.Accent, checkedThumbColor = K.OnAccent, uncheckedTrackColor = p.surface2, uncheckedThumbColor = p.textDim, uncheckedBorderColor = p.grid))
     }
 }
 
