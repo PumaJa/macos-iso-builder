@@ -56,6 +56,8 @@ data class TelemetrySample(
     val lateralG: Q = Q.NA,
     val leanDeg: Q = Q.NA,
     val pitchDeg: Q = Q.NA,
+    val gForce: Q = Q.NA,           // peak |a| in g since the previous sample (phone accelerometer or VESC IMU)
+    val airtimeMs: Long? = null,    // cumulative airtime of this ride (CALCULATED from the accelerometer)
     val bms: BmsSnapshot? = null,
     val controllers: Int = 1,
 )

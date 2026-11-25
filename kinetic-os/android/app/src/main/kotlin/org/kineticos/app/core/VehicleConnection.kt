@@ -46,6 +46,8 @@ class VehicleConnection(
     /** Persists "last time this app wrote limits to controller <uuid>" (survives app restarts). */
     private val writeLog: WriteLog = WriteLog.InMemory(),
 ) {
+    /** Optional phone accelerometer for G-force / airtime (set by AppGraph). */
+    var motion: MotionSource? = null
     interface WriteLog {
         fun lastWrite(uuid: String): Long
         fun mark(uuid: String, t: Long)
@@ -165,6 +167,7 @@ class VehicleConnection(
         _caps.value = caps
         mc?.let { conf -> _backup.value = reconcileBackup(fw, conf, uptimeMs) }
         reachedOnline = true
+        motion?.detector?.reset()
         _status.value = ConnStatus.Online("${fw.hardwareName} · FW ${fw.versionString}" + if (ids.isNotEmpty()) " · CAN ${ids.joinToString()}" else "", t.kind == TransportKind.SIMULATION)
         val eng = TelemetryEngine(drivetrain, simulated = t.kind == TransportKind.SIMULATION).also { engine = it }
         val poller = AdaptivePoller(minMs = 1000L / 50, start = 1000L / pollHz.coerceIn(1, 50))
@@ -186,7 +189,12 @@ class VehicleConnection(
                 val rtt = System.currentTimeMillis() - t0
                 poller.onSuccess(rtt); misses = 0; _linkHealthy.value = true
                 _lastValues.value = v
-                _sample.value = eng.process(System.currentTimeMillis(), v, gps.fix.value, imu, bms, 1 + caps.canIds.size, adc, odo)
+                val base = eng.process(System.currentTimeMillis(), v, gps.fix.value, imu, bms, 1 + caps.canIds.size, adc, odo)
+                val m = motion
+                _sample.value = if (m == null) base else base.copy(
+                    gForce = Q.of(m.takePeakG(), if (base.simulated) Quality.SIMULATED else Quality.MEASURED),
+                    airtimeMs = m.detector.totalAirtimeMs,
+                )
             } catch (e: VescTimeoutException) {
                 poller.onTimeout(); misses++; _linkHealthy.value = misses < 2
                 if (misses >= 5) throw IllegalStateException("VESC not responding")

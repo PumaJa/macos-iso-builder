@@ -86,6 +86,7 @@ fun GroupScreen(activity: MainActivity) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
         SectionTitle(stringResource(R.string.grp_title))
         StarkCompatCard()
+        VargLinkCard()
         if (settings.serverUrl.isBlank() || settings.authToken == null) {
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(stringResource(R.string.grp_server_needed), color = p.textDim)
@@ -179,11 +180,42 @@ fun StarkCompatCard() {
     val ctx = LocalContext.current; val p = LocalPalette.current
     Card(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.stark_title), style = labelStyle(12), color = K.Warn)
-        Text(stringResource(R.string.stark_text1), color = p.textDim, style = labelStyle(10))
+        Text(stringResource(R.string.stark_text1_v2), color = p.textDim, style = labelStyle(10))
         Text(stringResource(R.string.stark_text2), color = p.textDim, style = labelStyle(10))
         BigButton(stringResource(R.string.stark_open), Modifier.fillMaxWidth().padding(top = 6.dp)) {
             runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=Stark%20Future")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 .onFailure { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=Stark%20Future")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
+    }
+}
+
+/**
+ * VargLink (independent third-party app, not by Stark) lets guests WITHOUT a Stark bike join a Stark owner's group ride
+ * via invite link – in the VargLink app or in the browser. There is no public API, so Kinetic OS only opens the
+ * official invite link / app; it does not imitate VargLink's protocol.
+ */
+@Composable
+fun VargLinkCard() {
+    val ctx = LocalContext.current; val p = LocalPalette.current
+    var link by remember { mutableStateOf("") }
+    val installed = remember { runCatching { ctx.packageManager.getPackageInfo("ru.varg.link", 0); true }.getOrDefault(false) }
+    Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(stringResource(R.string.varglink_title), style = labelStyle(12), color = K.Accent)
+        Text(stringResource(R.string.varglink_text), color = p.textDim, style = labelStyle(10))
+        Field(stringResource(R.string.varglink_link_hint), link, { link = it.trim() }, Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            BigButton(stringResource(R.string.varglink_join), Modifier.weight(1f), enabled = link.startsWith("https://") || link.startsWith("http://")) {
+                val i = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (installed) i.setPackage("ru.varg.link")
+                runCatching { ctx.startActivity(i) }.onFailure { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+            BigButton(stringResource(if (installed) R.string.varglink_open else R.string.varglink_install), Modifier.weight(1f)) {
+                val launch = ctx.packageManager.getLaunchIntentForPackage("ru.varg.link")
+                if (launch != null) ctx.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                else runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=ru.varg.link")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    .onFailure { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=ru.varg.link")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        }
+        Text(stringResource(R.string.varglink_note), color = p.textDim, style = labelStyle(9))
     }
 }

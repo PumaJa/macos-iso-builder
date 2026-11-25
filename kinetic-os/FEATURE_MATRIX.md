@@ -74,7 +74,7 @@ erforderlich · **NS** = Nicht unterstützt.
 |---|---|---|---|
 | Teilnahme an originalen Stark-Gruppenfahrten, Stark-Konto, Stark-Gruppencodes | ? | keine autorisierte Schnittstelle gefunden | EXT |
 | Anzeige echter Stark-VARG-Fahrer | ? | nur wenn diese der Kinetic-Gruppe beitreten | EXT |
-| VargLink-Integration | – | Projekt nicht auffindbar/verifizierbar | EXT |
+| VargLink-Integration | – | VargLink ist eine Dritt-App (`ru.varg.link`, nicht von Stark) ohne öffentliche API: Kinetic öffnet Einladungslinks in VargLink oder im Browser, Installationslink | IH (Link-Öffnen) / EXT (Datenaustausch) |
 | Eigenes Gruppensystem: Gruppen, Codes, Einladungen (Deep Link), öffentlich/privat | – | Server + App | IT (Server) / IH |
 | Live-Positionen, Fahrzeugname, Freundesliste, Präsenz | – | WebSocket | IT (Server, App-Socket) |
 | Chat, Sprachnachrichten, Hilfe-Anfrage, gemeinsame Route | – | ja | IT (Server) / IH (App) |
@@ -130,10 +130,26 @@ erforderlich · **NS** = Nicht unterstützt.
 | VESC-Paket `kinetic.vescpkg` (mit VESC Tool 7.01 gebaut) | TI – gebaut und strukturell geprüft, nicht in VESC Tool geladen |
 | Diebstahlsperre (Wegfahrsperre im VESC-Skript, PIN, übersteht Neustart, nur im Stand, Schiebe-/Abschlepp-Erkennung → Alarm am Zweithandy) | IT (Simulator-E2E, Server, LispBM-Interpreter) / IH |
 
+## Aus den Stark-App-Funktionen (Funktionsumfang, eigene Gestaltung)
+| Funktion | Status |
+|---|---|
+| Startseite mit Fahrzeugbild, Akku, Modus, Fahrzeit und Kacheln (Cockpit, Statistik, Modi, Trails, Strecken, Fahrten, Gruppe, VESC) | IT (Render) |
+| Statistik gesamt/pro Fahrt: Zeit, Strecke, Airtime, Fahrten, Höchsttempo, max. Leistung, max. G-Kraft, Energie; Simulationsfahrten nur per Schalter | IT (Render) |
+| Airtime-/Sprungerkennung + G-Kraft über Handy-Beschleunigungssensor | IT (Logik) / IH |
+| Fahrmodi-Schnellwahl M1–M5, Leistung in PS/kW, Rekuperation pro Modus | IT (Render) / IH |
+| Cockpit: Fahrzeit, Neutral-Anzeige „N“ | IT (Render, Simulator-E2E) |
+| Neutral (Antrieb aus, Einschalten immer, Ausschalten nur im Stand) im Fahrzeugskript | IT (Simulator-E2E, LispBM-Interpreter) |
+| Kindersicherung: PIN-geschützte Leistungs-/Tempo-Grenze im Fahrzeugskript (Senken jederzeit, Lockern nur im Stand) | IT (Simulator-E2E, LispBM-Interpreter) |
+| Diebstahlsperre (Bike Lock) | siehe oben |
+| Bildschirmhelligkeit in der App | IH |
+| Sprachen DE/EN/FR/IT/ES/SV | IT (Lint) – FR/IT/ES/SV maschinell, Review nötig |
+| Firmware-Update über WLAN | bewusst nicht (Brick-Risiko) – VESC Tool verwenden |
+| Map-Switch-LED | nicht anwendbar (Stark-Hardware) |
+
 ## Bedienung & Verteilung
 | Funktion | Status |
 |---|---|
-| Deutsche und englische Oberfläche (Systemsprache) | IT (Render-Test DE) – Meldungen aus der Kernlogik noch englisch |
+| Oberfläche DE/EN, zusätzlich FR/IT/ES/SV (Systemsprache) | IT (Render-Test DE) – Meldungen aus der Kernlogik noch englisch |
 | Eigene Release-Signatur (keystore.properties / Umgebungsvariablen), APKs pro Architektur | IT (signierter Build geprüft) |
 
 ## Was NICHT nachgebildet wird

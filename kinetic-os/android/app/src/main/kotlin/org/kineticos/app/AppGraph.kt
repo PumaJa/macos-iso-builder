@@ -47,6 +47,7 @@ class AppGraph(val ctx: Context) {
     val api = Api({ settings.value.serverUrl }, { settings.value.authToken })
     val socket = LiveSocket(api, { settings.value.serverUrl }, { settings.value.authToken }, scope)
     val warnings = org.kineticos.app.alerts.WarningCenter(ctx, scope, connection, settings)
+    val motion = MotionSource(ctx) { connection.sample.value?.speedMps?.value?.times(3.6) }.also { connection.motion = it }
 
     val vehicles: StateFlow<List<VehicleProfile>> = db.vehicles().all()
         .map { l -> l.mapNotNull { runCatching { AppJson.decodeFromString<VehicleProfile>(it.json) }.getOrNull() } }
@@ -72,6 +73,7 @@ class AppGraph(val ctx: Context) {
     fun startRuntime() {
         if (started) return; started = true
         gps.start()
+        motion.start()
         scope.launch { connection.events.collect { _toast.emit(it) } }
         warnings.start()
         // keep drivetrain in sync with the active vehicle
@@ -238,6 +240,34 @@ class AppGraph(val ctx: Context) {
                     else -> "Vehicle state does not confirm the action – check lock state"
                 }
             } catch (e: Exception) { "No confirmation from vehicle (${e.message}) – check lock state before leaving" }
+        }
+    }
+
+    /** Neutral ("N"): drive disabled on the controller. On = always allowed, off = standstill only. */
+    suspend fun setNeutral(on: Boolean): String = writeMutex.withLock {
+        val c = connection.client ?: return@withLock "Not connected"
+        when (val d = gate.planNeutral(on, connection.scriptStatus.value, liveState())) {
+            is LockDecision.Denied -> d.reason
+            is LockDecision.Allowed -> try {
+                val st = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token))?.takeIf { it.echoedCommand == 7 } ?: connection.refreshScript()
+                st?.let { connection.updateScript(it) }
+                when { st == null -> "No confirmation from vehicle"; st.echoedCommand == 7 && st.result != 0 -> "Refused by vehicle: ${st.resultText}"
+                    st.neutral == on -> if (on) "NEUTRAL – drive disabled" else "Drive enabled"; else -> "Vehicle state does not confirm neutral" }
+            } catch (e: Exception) { "No confirmation from vehicle (${e.message})" }
+        }
+    }
+
+    /** Parental limit (PIN-protected, stored on the vehicle). maxScale 1.0 + no speed = clear. */
+    suspend fun setParental(pin: String, maxScale: Double, maxSpeedKmh: Double?): String = writeMutex.withLock {
+        val c = connection.client ?: return@withLock "Not connected"
+        when (val d = gate.planParental(pin, maxScale, maxSpeedKmh, connection.scriptStatus.value, connection.backup.value, liveState())) {
+            is LockDecision.Denied -> d.reason
+            is LockDecision.Allowed -> try {
+                val st = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token))?.takeIf { it.echoedCommand == 8 } ?: connection.refreshScript()
+                st?.let { connection.updateScript(it) }
+                when { st == null -> "No confirmation from vehicle"; st.result != 0 -> "Refused by vehicle: ${st.resultText}"
+                    else -> if (st.parentalActive) "Parental limit active: %.0f %%".format((st.parentalScale ?: 1.0) * 100) else "Parental limit cleared" }
+            } catch (e: Exception) { "No confirmation from vehicle (${e.message})" }
         }
     }
 

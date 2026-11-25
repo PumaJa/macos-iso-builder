@@ -8,7 +8,7 @@ Transport: VESC `COMM_CUSTOM_APP_DATA` (phone -> VESC arrives in LispBM as `even
 |---|---|---|
 | 0 | magic | 0x4B ('K') |
 | 1 | version | 2 (current) or 1 (legacy cmd 2 layout) |
-| 2 | command | 1 set mode, 2 set custom params, 3 status request, 4 lock, 5 unlock, 6 set PIN |
+| 2 | command | 1 set mode, 2 set custom params, 3 status request, 4 lock, 5 unlock, 6 set PIN, 7 neutral, 8 parental limit |
 
 ### cmd 1 - set mode (length 4)
 | 3 | mode index | 0 eco, 1 sport, 2 race, 3 custom1, 4 custom2 |
@@ -52,9 +52,23 @@ Lock is accepted only if a PIN is set (else code 8), the PIN is correct (7 wrong
 
 Only while unlocked (else code 11). New PIN outside range: code 10. Wrong old PIN counts toward the lockout.
 
+### cmd 7 - neutral (length 4)
+| 3 | on | u8: 1 = neutral on, 0 = off |
+
+On: `app-disable-output -1` (throttle ignored, motor freewheels, no brake current); always allowed, no PIN. Off: re-enables output only if |ERPM| < stop threshold (else code 3) and not locked (code 11). Other values: code 2. Neutral is NOT persisted: after power-up drive is enabled (unless locked). It is re-asserted every loop tick independent of the lock, and unlock does not re-enable output while neutral is on.
+
+### cmd 8 - parental limit (length 13)
+| Byte | Field | Type |
+|---|---|---|
+| 3-6 | PIN | u32 |
+| 7-8 | max current scale, permille (>= 1000 = no scale limit; below 50 is raised to 50) | u16 |
+| 9-12 | max ERPM (0 = no ERPM limit) | u32 |
+
+Persistent ceiling stored in EEPROM and loaded at boot before modes are applied. Effective ceiling = min(boot ceiling, parental) for every mode and for custom params (stored custom values are clamped when set; raising the parental limit later does not restore them). Needs the lock PIN: code 8 if none set, 7/9 as for cmd 4-6, 11 while locked. Stationary: normal counted PIN check, any change allowed, EEPROM written at once. Moving: only a reduction (both values not above the current ones) is accepted; it takes effect immediately, the PIN is checked without counting or EEPROM writes (wrong: code 7, lockout active: 9), and the EEPROM write is deferred until standstill. Raising or clearing while moving: code 3 (nothing counted or written). `1000` + `0` clears the limit.
+
 While locked, cmd 1 and cmd 2 are refused with code 11; cmd 3 (status) is always answered.
 
-## Reply (VESC -> phone), 19 bytes. Sent after every accepted/rejected cmd 1-3.
+## Reply (VESC -> phone), 22 bytes. Sent after every accepted/rejected cmd 1-3.
 
 | Byte | Field | Type / notes |
 |---|---|---|
@@ -73,7 +87,10 @@ While locked, cmd 1 and cmd 2 are refused with code 11; cmd 3 (status) is always
 | 17 | lock flags | u8: bit0 locked, bit1 PIN set, bit2 TAMPER, bit3 locked out (PIN attempts refused) |
 | 18 | lockout remaining, seconds | u8, rounded up, saturates at 255 |
 
-Bytes 0-16 are identical to the earlier 17-byte reply, so old parsers that read only those still work.
+| 19 | flags2 | u8: bit0 neutral, bit1 parental limit active |
+| 20-21 | parental max current scale, permille | u16, 1000 when no scale limit |
+
+Bytes 0-16 are identical to the original 17-byte reply and bytes 0-18 to the 19-byte one, so old parsers that read only those still work.
 
 ## Reject / result codes
 | Code | Meaning |
@@ -88,7 +105,7 @@ Bytes 0-16 are identical to the earlier 17-byte reply, so old parsers that read 
 | 8 | no PIN set (cmd 4/5) |
 | 9 | PIN attempts locked out (see cmd 4/5) |
 | 10 | new PIN not 1000..99999999 |
-| 11 | vehicle is locked (cmd 1, 2, 6 refused) |
+| 11 | vehicle is locked (cmd 1, 2, 6, 8 refused; neutral off refused) |
 
 (Code 1 is unused/reserved.)
 

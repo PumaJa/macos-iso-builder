@@ -40,6 +40,12 @@ fun ModesScreen() {
     LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.modes_title))
+            // M1…M5 quick slots (first five modes) – one tap applies through the SafetyGate
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                profiles.take(5).forEachIndexed { i, pr ->
+                    BigButton("⚡M${i + 1}", Modifier.weight(1f), selected = applied?.id == pr.id, compact = true) { scope.launch { result = g.applyProfile(pr) } }
+                }
+            }
             Card(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.modes_fw, caps.firmware?.versionString ?: "—", stringResource(if (caps.firmwareSupportedForWrites) R.string.modes_supported else R.string.modes_blocked)), color = p.text)
                 Text(stringResource(R.string.modes_backup, backup?.let { stringResource(R.string.modes_taken, java.text.SimpleDateFormat("dd.MM.yy HH:mm").format(java.util.Date(it.takenAtMs))) } ?: stringResource(R.string.modes_backup_none)), color = p.textDim)
@@ -102,7 +108,9 @@ private fun ProfileEditor(initial: RideProfile, onDone: (RideProfile?) -> Unit) 
         item {
             SectionTitle(stringResource(R.string.edit_title))
             Field(stringResource(R.string.edit_name), pr.name, { pr = pr.copy(name = it.take(16)) }, Modifier.fillMaxWidth())
-            LabeledSlider(stringResource(R.string.edit_power), pr.powerFraction.toFloat(), { pr = pr.copy(powerFraction = it.toDouble()) })
+            val maxW = LocalContext.current.graph.connection.backup.collectAsStateWithLifecycle().value?.conf?.wattMax
+            LabeledSlider(stringResource(R.string.edit_power), pr.powerFraction.toFloat(), { pr = pr.copy(powerFraction = it.toDouble()) },
+                display = { f -> maxW?.let { "%.0f PS · %.1f kW (%.0f%%)".format(it * f / 735.49875, it * f / 1000, f * 100) } ?: "%.0f%%".format(f * 100) })
             LabeledSlider(stringResource(R.string.edit_motor), pr.motorCurrentFraction.toFloat(), { pr = pr.copy(motorCurrentFraction = it.toDouble()) })
             LabeledSlider(stringResource(R.string.edit_batt), pr.batteryCurrentFraction.toFloat(), { pr = pr.copy(batteryCurrentFraction = it.toDouble()) })
             LabeledSlider(stringResource(R.string.edit_regen), pr.regenFraction.toFloat(), { pr = pr.copy(regenFraction = it.toDouble()) })

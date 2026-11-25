@@ -3,7 +3,8 @@
 1. **No hardware validation.** Everything touching a real VESC (BLE/USB/TCP transports, ride-mode writes, LispBM) is only tested
    against the protocol simulator. Treat as experimental; test on a stand with the wheel off the ground.
 2. **Stark compatibility:** no authorised interface → no joining Stark group rides, no Stark accounts, no display of Stark riders
-   unless they use Kinetic. "VargLink" could not be found.
+   unless they use Kinetic. VargLink (third-party app `ru.varg.link`, not by Stark) has no public API: Kinetic only opens
+   VargLink invite links in the VargLink app or the browser – no positions are exchanged between VargLink and Kinetic groups.
 3. **Throttle curve / engine character / engine braking** are modelled and previewed, but the VESC executes its own ADC app
    throttle mapping. Executing custom curves requires a LispBM throttle controller, which is intentionally not shipped
    unvalidated. Approximate engine characters are illustrative only.
@@ -26,3 +27,9 @@
 16. **kinetic.vescpkg** was built with VESC Tool 7.01 (compiled here with small Qt 6.4 compatibility patches) and verified structurally; it has not been loaded in an official VESC Tool or on a VESC.
 17. PiP mini cockpit, voice warnings and dash tile selection were render-tested on the JVM only; check on a real phone.
 15. LispBM: validated in the LispBM interpreter (lispBM 0.41, newer than some firmware builds) – not yet on a VESC. Re-uploading the script without a VESC power cycle makes already-reduced limits the new ceiling (documented).
+22. **Firmware update over WiFi/BLE is not implemented** on purpose: a failed VESC flash can brick the controller. Use VESC Tool for firmware updates.
+23. **Map-switch LED** (Stark handlebar hardware) has no VESC equivalent; not applicable.
+24. **Airtime / g-force** come from the phone accelerometer. They are only plausible with the phone rigidly mounted on the vehicle; in a pocket/backpack values are unreliable. Labelled as phone-sensor values.
+25. **FR/IT/ES/SV translations** were machine-made and need review by native speakers; some long labels may be truncated.
+26. **Parental lock speed limit** needs correct wheel/gear data (VESC setup); without it only the power limit is available.
+27. **Power display in PS/kW** in ride modes is derived from the backed-up `l_watt_max` of the controller, not a dyno value.

@@ -164,3 +164,22 @@ class TelemetryEdgeCaseTest {
         kotlin.test.assertEquals(0.0, Calc.socFromCellVoltage(Double.NaN))
     }
 }
+
+class AirtimeDetectorTest {
+    @kotlin.test.Test fun detectsJumpOnlyWhenRidingAndWithinPlausibleDuration() {
+        val d = AirtimeDetector()
+        var t = 0L
+        fun run(g: Double, ms: Long, kmh: Double? = 30.0) { val end = t + ms; while (t < end) { d.feedG(t, g, kmh); t += 10 } }
+        run(1.0, 500); run(0.1, 800); run(2.4, 100)                 // landing spike
+        kotlin.test.assertEquals(1, d.jumps.size)
+        kotlin.test.assertEquals(800.0, d.jumps[0].durationMs.toDouble(), 20.0)
+        kotlin.test.assertEquals(2.4, d.peakG, 1e-9)
+        run(1.0, 300); run(0.2, 100); run(1.0, 300)                  // 100 ms dip = bump, not a jump
+        kotlin.test.assertEquals(1, d.jumps.size)
+        run(1.0, 300, 0.0); run(0.0, 1000, 0.0); run(1.0, 300, 0.0)  // phone dropped at standstill
+        kotlin.test.assertEquals(1, d.jumps.size)
+        run(0.0, 8000); run(1.0, 100)                                // 8 s "free fall" = implausible
+        kotlin.test.assertEquals(1, d.jumps.size)
+        kotlin.test.assertEquals(800.0, d.totalAirtimeMs.toDouble(), 20.0)
+    }
+}

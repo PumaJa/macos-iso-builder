@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -76,6 +77,40 @@ fun LockDialog(close: () -> Unit) {
                     else -> { BigButton(stringResource(R.string.lock_btn_lock), Modifier.weight(1f), enabled = !busy, color = K.Danger) { run("lock") }; BigButton(stringResource(R.string.lock_btn_change_pin), Modifier.weight(1f)) { setMode = true; msg = null } }
                 }
             }
+            if (!setMode && !lock.locked && lock.pinSet) ParentalSection(pin)
         }
     })
+}
+
+/** "N" toggle (neutral): only shown when the vehicle script supports it. */
+@Composable
+fun NeutralPill() {
+    val g = LocalContext.current.graph
+    val st by g.connection.scriptStatus.collectAsStateWithLifecycle()
+    val n = st?.neutral ?: return
+    val scope = rememberCoroutineScope()
+    BigButton("N", color = if (n) K.Warn else LocalPalette.current.textDim, selected = n, compact = true, modifier = Modifier.padding(end = 6.dp).widthIn(min = 56.dp)) {
+        scope.launch { g.toast(g.setNeutral(!n)) }
+    }
+}
+
+/** Parental limit section (inside the lock dialog). */
+@Composable
+fun ParentalSection(pin: String) {
+    val g = LocalContext.current.graph; val p = LocalPalette.current
+    val st by g.connection.scriptStatus.collectAsStateWithLifecycle()
+    val cur = st?.parentalScale ?: return
+    val scope = rememberCoroutineScope()
+    var scale by remember { mutableFloatStateOf(cur.toFloat()) }
+    var speed by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf<String?>(null) }
+    Text(stringResource(R.string.parental_title) + if (st?.parentalActive == true) " · %.0f %%".format(cur * 100) else "", style = labelStyle(12), color = K.Accent, modifier = Modifier.padding(top = 10.dp))
+    LabeledSlider(stringResource(R.string.parental_power), scale, { scale = it }, 0.05f..1f)
+    Field(stringResource(R.string.parental_speed), speed, { speed = it.filter { c -> c.isDigit() }.take(3) }, Modifier.fillMaxWidth(), number = true)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        BigButton(stringResource(R.string.parental_apply), Modifier.weight(1f), compact = true) { scope.launch { msg = g.setParental(pin, scale.toDouble(), speed.toDoubleOrNull()) } }
+        BigButton(stringResource(R.string.parental_clear), Modifier.weight(1f), compact = true) { scope.launch { msg = g.setParental(pin, 1.0, null) } }
+    }
+    msg?.let { Text(it, color = p.textDim, style = labelStyle(10)) }
+    Text(stringResource(R.string.parental_note), color = p.textDim, style = labelStyle(9))
 }

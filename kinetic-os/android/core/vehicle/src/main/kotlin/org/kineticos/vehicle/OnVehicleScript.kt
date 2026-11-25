@@ -15,7 +15,11 @@ data class ScriptStatus(
     val tempMosC: Int, val tempMotorC: Int, val voltageV: Double, val erpm: Int,
     /** Anti-theft lock (reply bytes 17–18; null = script without lock support). */
     val lock: LockState? = null,
+    /** Neutral (drive disabled) and parental limit (reply bytes 19–21; null = older script). */
+    val neutral: Boolean? = null,
+    val parentalScale: Double? = null,
 ) {
+    val parentalActive get() = parentalScale != null && parentalScale < 1.0
     val derating get() = derateMosfet || derateMotor || derateVoltage
     val resultText get() = OnVehicleScript.resultText(result)
 }
@@ -41,6 +45,11 @@ object OnVehicleScript {
     fun validPin(pin: String) = pin.length in 4..8 && pin.all { it.isDigit() } && pin.toLong() >= 1000
     fun lock(pin: String): ByteArray { require(validPin(pin)); return base(4).u32(pin.toLong()).toByteArray() }
     fun unlock(pin: String): ByteArray { require(validPin(pin)); return base(5).u32(pin.toLong()).toByteArray() }
+    fun neutral(on: Boolean): ByteArray = base(7).u8(if (on) 1 else 0).toByteArray()
+    /** Parental ceiling (PIN-protected). scale 1.0 and maxErpm 0 clear it. */
+    fun parental(pin: String, maxScale: Double, maxErpm: Long): ByteArray {
+        require(validPin(pin)); return base(8).u32(pin.toLong()).i16((maxScale.coerceIn(0.05, 1.0) * 1000).toInt()).u32(maxErpm.coerceIn(0, 0xFFFFFFFFL)).toByteArray()
+    }
     fun setPin(oldPin: String?, newPin: String): ByteArray {
         require(validPin(newPin)); val old = oldPin?.takeIf { validPin(it) }?.toLong() ?: 0L
         return base(6).u32(old).u32(newPin.toLong()).toByteArray()
@@ -59,7 +68,9 @@ object OnVehicleScript {
         val cmd = r.u8(); val res = r.u8(); val mode = r.u8(); val scale = r.u16() / 1000.0; val flags = r.u8(); val rej = r.u8()
         val tm = r.u8().toByte().toInt(); val tmo = r.u8().toByte().toInt(); val v = r.u16() / 10.0; val erpm = r.i32()
         val lock = if (r.remaining >= 2) { val lf = r.u8(); LockState(lf and 1 != 0, lf and 2 != 0, lf and 4 != 0, lf and 8 != 0, r.u8()) } else null
-        return ScriptStatus(ver, cmd, res, mode, scale, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, rej, tm, tmo, v, erpm, lock)
+        var neutral: Boolean? = null; var parental: Double? = null
+        if (r.remaining >= 3) { val f2 = r.u8(); neutral = f2 and 1 != 0; val ps = r.u16() / 1000.0; parental = if (f2 and 2 != 0) ps else 1.0 }
+        return ScriptStatus(ver, cmd, res, mode, scale, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, rej, tm, tmo, v, erpm, lock, neutral, parental)
     }
 
     fun resultText(code: Int) = when (code) {
@@ -133,4 +144,34 @@ fun SafetyGate.planLock(action: String, pin: String, newPin: String? = null, sta
         }
         else -> LockDecision.Denied("unknown action")
     }
+}
+
+/** Neutral on is always allowed (it only disables drive); neutral off (= enabling drive) only at standstill and never while locked. */
+fun SafetyGate.planNeutral(on: Boolean, status: ScriptStatus?, live: LiveState, stationaryKmh: Double = 2.0): LockDecision {
+    val st = status ?: return LockDecision.Denied("Neutral needs the vehicle script (kinetic.vescpkg)")
+    if (st.neutral == null) return LockDecision.Denied("Installed script is too old for neutral – update kinetic.vescpkg")
+    if (!live.linkHealthy) return LockDecision.Denied("Link unstable")
+    if (!on) {
+        if (st.lock?.locked == true) return LockDecision.Denied("Vehicle is locked")
+        val speed = live.speedKmh ?: return LockDecision.Denied("Speed unknown – cannot verify standstill")
+        if (speed > stationaryKmh) return LockDecision.Denied("Leaving neutral is only possible at standstill")
+    }
+    return LockDecision.Allowed(OnVehicleScript.wrap(OnVehicleScript.neutral(on)), WriteToken.issue("SafetyGate", "neutral $on"))
+}
+
+/** Parental limit: PIN-protected ceiling on the vehicle. Lowering always allowed; raising/clearing only at standstill. */
+fun SafetyGate.planParental(pin: String, maxScale: Double, maxSpeedKmh: Double?, status: ScriptStatus?, backup: McConfBackup?, live: LiveState, stationaryKmh: Double = 2.0): LockDecision {
+    val st = status ?: return LockDecision.Denied("Parental limit needs the vehicle script (kinetic.vescpkg)")
+    if (st.parentalScale == null) return LockDecision.Denied("Installed script is too old for the parental limit – update kinetic.vescpkg")
+    if (st.lock?.pinSet != true) return LockDecision.Denied("Set a lock PIN first (used for the parental limit too)")
+    if (!OnVehicleScript.validPin(pin)) return LockDecision.Denied("PIN must be 4–8 digits")
+    if (!maxScale.isFinite() || maxScale !in 0.05..1.0) return LockDecision.Denied("Limit must be 5–100 %")
+    if (!live.linkHealthy) return LockDecision.Denied("Link unstable")
+    val raising = maxScale > (st.parentalScale ?: 1.0) || maxSpeedKmh == null
+    val speed = live.speedKmh
+    if (raising && (speed == null || speed > stationaryKmh)) return LockDecision.Denied("Raising or clearing the limit is only possible at standstill")
+    val b = backup?.conf
+    val fact = if (b != null && b.wheelDiameterM > 0 && b.gearRatio > 0 && b.motorPoles > 0) (b.motorPoles / 2.0) * 60.0 * b.gearRatio / (b.wheelDiameterM * kotlin.math.PI) else 0.0
+    val erpm = if (maxSpeedKmh == null) 0L else { if (fact <= 0) return LockDecision.Denied("Speed limit needs the VESC wheel/gear setup"); (maxSpeedKmh / 3.6 * fact).toLong().coerceAtLeast(1) }
+    return LockDecision.Allowed(OnVehicleScript.wrap(OnVehicleScript.parental(pin, maxScale, erpm)), WriteToken.issue("SafetyGate", "parental"))
 }

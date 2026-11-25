@@ -44,6 +44,8 @@ data class AppSettings(
     val pipOnLeave: Boolean = true,
     val primaryValue: PrimaryValue = PrimaryValue.SPEED,
     val dashTiles: List<String> = DEFAULT_TILES,
+    /** App screen brightness 0.05..1, or -1 = follow system. */
+    val screenBrightness: Float = -1f,
 )
 
 class SettingsRepo(private val ctx: Context) {
@@ -57,7 +59,7 @@ class SettingsRepo(private val ctx: Context) {
         val token = stringPreferencesKey("token"); val user = stringPreferencesKey("user"); val tele = booleanPreferencesKey("telematics")
         val share = booleanPreferencesKey("share"); val styleDay = stringPreferencesKey("styleDay"); val styleNight = stringPreferencesKey("styleNight")
         val saver = booleanPreferencesKey("saver"); val alerts = booleanPreferencesKey("alerts"); val voice = booleanPreferencesKey("voice"); val vib = booleanPreferencesKey("vib")
-        val pip = booleanPreferencesKey("pip"); val primary = stringPreferencesKey("primary"); val tiles = stringPreferencesKey("tiles")
+        val pip = booleanPreferencesKey("pip"); val primary = stringPreferencesKey("primary"); val tiles = stringPreferencesKey("tiles"); val bright = floatPreferencesKey("bright")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -73,6 +75,7 @@ class SettingsRepo(private val ctx: Context) {
             p[K.voice] ?: d.voiceAlerts, p[K.vib] ?: d.vibrateAlerts, p[K.pip] ?: d.pipOnLeave,
             p[K.primary]?.let { runCatching { PrimaryValue.valueOf(it) }.getOrNull() } ?: d.primaryValue,
             p[K.tiles]?.split(',')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: d.dashTiles,
+            p[K.bright] ?: d.screenBrightness,
         )
     }
     suspend fun current() = flow.first()
@@ -86,7 +89,7 @@ class SettingsRepo(private val ctx: Context) {
             put(K.glove, n.gloveMode); put(K.poll, n.pollHz.coerceIn(1, 50)); put(K.server, n.serverUrl.trim().trimEnd('/')); put(K.token, n.authToken?.let { TokenCipher.encrypt(it) })
             put(K.user, n.username); put(K.tele, n.telematicsEnabled); put(K.share, n.shareTelemetryInGroups)
             put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver); put(K.alerts, n.alertNotifications); put(K.voice, n.voiceAlerts); put(K.vib, n.vibrateAlerts); put(K.pip, n.pipOnLeave)
-            put(K.primary, n.primaryValue.name); put(K.tiles, n.dashTiles.take(9).joinToString(","))
+            put(K.primary, n.primaryValue.name); put(K.tiles, n.dashTiles.take(9).joinToString(",")); put(K.bright, n.screenBrightness)
         }
     }
 }

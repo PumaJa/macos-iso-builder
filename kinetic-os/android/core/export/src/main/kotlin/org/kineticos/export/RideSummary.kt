@@ -17,6 +17,8 @@ data class RideSummary(
     val whPerKm: Double?,             // NET (used - regen) per km; null if distance < 10 m or no energy data
     val elevationGainM: Double,
     val elevationLossM: Double,
+    val airtimeMs: Long? = null,       // from the accelerometer (null = no sensor data)
+    val maxG: Double? = null,
 ) {
     val netEnergyWh: Double? get() = if (energyUsedWh == null) null else energyUsedWh - (energyRegenWh ?: 0.0)
 
@@ -99,8 +101,10 @@ data class RideSummary(
                 val d = g - r0
                 if (d >= elevationDeadbandM) { gain += d; ref = g } else if (d <= -elevationDeadbandM) { loss -= d; ref = g }
             }
+            val air = sorted.mapNotNull { it.airtimeMs }.let { if (it.isEmpty()) null else it.max() - it.min() }
+            val maxG = sorted.mapNotNull { it.gForce.value?.takeIf { g -> g.isFinite() } }.maxOrNull()
             return RideSummary(dist, src, duration, moving, if (moving > 0) dist / (moving / 1000.0) else null, maxSpeed, maxPower,
-                used, regen, whKm, gain, loss)
+                used, regen, whKm, gain, loss, air, maxG)
         }
 
         private fun speedOfFor(s: TelemetrySample, vescOnly: Boolean): Double? =

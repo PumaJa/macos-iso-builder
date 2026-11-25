@@ -53,6 +53,8 @@ fun SettingsScreen() {
         Toggle(stringResource(R.string.set_vibrate), s.vibrateAlerts, { v -> upd { it.copy(vibrateAlerts = v) } })
         Toggle(stringResource(R.string.set_pip), s.pipOnLeave, { v -> upd { it.copy(pipOnLeave = v) } }, stringResource(R.string.set_pip_sub))
         Toggle(stringResource(R.string.set_glove), s.gloveMode, { v -> upd { it.copy(gloveMode = v) } })
+        LabeledSlider(stringResource(R.string.settings_brightness), if (s.screenBrightness < 0) 0f else s.screenBrightness, { v -> upd { it.copy(screenBrightness = if (v < 0.05f) -1f else v) } },
+            0f..1f, { if (it < 0.05f) ctx.getString(R.string.settings_brightness_auto) else "%.0f%%".format(it * 100) })
         Toggle(stringResource(R.string.set_keep_on), s.keepScreenOn, { v -> upd { it.copy(keepScreenOn = v) } })
         LabeledSlider(stringResource(R.string.set_dim), s.dimAfterIdleS.toFloat(), { v -> upd { it.copy(dimAfterIdleS = v.toInt()) } }, 0f..600f, { if (it < 1) offText else "%.0f s".format(it) })
         SectionTitle(stringResource(R.string.set_cockpit))

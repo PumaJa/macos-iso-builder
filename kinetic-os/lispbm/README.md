@@ -55,6 +55,10 @@ Phone-independent immobilizer, enforced on the VESC (commands 4/5/6 in `protocol
 - Honest limits: anyone with USB/CAN access and VESC Tool can read the EEPROM, stop the script, or just run `set-current`/write the motor config; the lock is a deterrent against casual theft and throttle-only attacks, not a security boundary. A different VESC app (or a CAN master / BMS / second controller) is not affected. EEPROM writes stop the motor briefly and are limited to ~100,000 per cell; the script writes only on lock, unlock, set-PIN and failed PIN attempts.
 - Not hardware tested; verify with the wheel off the ground that (app-disable-output -1) really blocks your throttle app, and that `l-current-max-scale` 0 is accepted by your firmware.
 
+## Neutral and parental limit
+- **Neutral (cmd 7):** `app-disable-output -1`, so throttle apps are ignored and the motor freewheels (no brake current). Turning it on is always allowed; turning it off needs standstill and an unlocked vehicle. Re-asserted every loop tick, and unlock does not end it. Design choice: neutral is **not persisted**, so after a power cycle drive is enabled again (unless locked); persisting it risks a "dead" scooter after a crash/reset that the rider cannot clear without the phone.
+- **Parental limit (cmd 8):** a persistent ceiling on current scale (permille) and ERPM, stored in EEPROM addr 104 (permille, absent = none) and 105 (ERPM, absent/0 = none), loaded at boot before modes are applied; effective ceiling = min(boot ceiling, parental) for all modes and custom params (watt and battery current are not limited by it). Needs the lock PIN with the same counted PIN check and lockout as cmd 4-6. Lowering while riding takes effect immediately (the EEPROM write waits for standstill, so cutting power first loses it); raising or clearing needs standstill. Refused while locked. Like the PIN, it can be cleared by anyone with VESC Tool (clear addr 104/105).
+
 ## Not implemented
 - **Forward/reverse crawl mode**: not implemented in LispBM. It needs app-level and hardware validation (reverse limits, direction handling, `l-min-erpm`). Document-only.
 - Speed limit uses `l-max-erpm`; `max-speed` (m/s) is not touched. Reverse limits (`l-min-erpm`, `l-current-min-scale`) are untouched.
@@ -72,9 +76,9 @@ Phone-independent immobilizer, enforced on the VESC (commands 4/5/6 in `protocol
 
 Run: `./test/run_tests.sh` (clones/builds the REPL under `/tmp/claude-0/lbm/src` if missing; override with `LBM_SRC=` or `LBM_REPL=`; needs git, gcc, make, libreadline-dev, libpng-dev). It exits non-zero on any failure. Manual build: `cd <lispBM>/repl && make FEATURES="64"`.
 
-Files: `test/stubs.lisp` (fake `conf-get`/`conf-set`/`get-temp-fet`/`get-temp-mot`/`get-vin`/`get-rpm`/`send-data`/`event-enable` with controllable state and call logs), `test/run_tests.lisp` (244 assertions), `test/smoke.lisp` and `test/smoke_locked.lisp` (end-to-end drivers, the second boots with the lock flag already in EEPROM).
+Files: `test/stubs.lisp` (fake `conf-get`/`conf-set`/`get-temp-fet`/`get-temp-mot`/`get-vin`/`get-rpm`/`send-data`/`event-enable` with controllable state and call logs), `test/run_tests.lisp` (302 assertions), `test/smoke.lisp` and `test/smoke_locked.lisp` (end-to-end drivers, the second boots with the lock flag already in EEPROM).
 
-Checked (244 assertions + 9 smoke checks, all passing):
+Checked (302 assertions + 9 smoke checks, all passing):
 - Core syntax actually accepted by the interpreter: `defun`, `define` (also inside functions, sets the global), `let`, `cond` with `t`, `if`, `{ }` blocks, `and`/`or`/`not`, `ix`/`first`/`rest`/`cons`, `to-i`/`to-float`, `bufcreate`, `bufget/bufset` u8/i8/u16/u32/i32 (big-endian), `spawn`, `recv` pattern `(event-data-rx . (? data))` with `_` fallthrough, `loopwhile`.
 - Boot ceiling read from `conf-get`, auto voltage thresholds, eco applied at start.
 - Every `conf-set` value stays <= boot ceiling (incl. ceiling scale 0.8, custom params of 65535/0xFFFFFFFF, hot and cold ticks).
@@ -85,6 +89,7 @@ Checked (244 assertions + 9 smoke checks, all passing):
 - Status reply: 17-byte layout byte-by-byte against `protocol.md` (big-endian, signed temps/erpm), all 1001 permille and 400 vin values round-trip.
 - Protocol v2 (u32 watts, 16-byte cmd 2): 120000 W accepted exactly, 4e9 W clamped to the ceiling, field byte order, short/bad-slot rejects, replies echo request version; v1 (u16 watts, 14-byte cmd 2) still works unchanged.
 - Anti-theft lock: lock refused while moving / without PIN / wrong PIN; PIN validation (4-8 digits) and XOR storage; lock persists across a simulated reboot (EEPROM flag re-read, output disabled, scale 0); output stays disabled and scale 0 while locked through ticks, derating and mode attempts (cmd 1/2/6 -> code 11); unlock wrong-PIN counting, 60 s lockout, doubling, 1 h cap, lockout state persisted in EEPROM and surviving simulated reboots (never shortened, cleared by a correct PIN after expiry, bounded EEPROM writes, PIN commands refused while moving); tamper set after > 1 s motion and cleared on unlock; 19-byte reply with lock flags and lockout seconds.
+- Neutral (on/off rules incl. moving and locked, output kept disabled every tick, not persisted, unlock does not end it) and parental limit (clamps modes and custom params, persists across simulated reboot, PIN/lockout/locked/moving rules, deferred write, clear, 22-byte reply layout).
 - Bad magic / version not 1 or 2 / too short: no reply, no state change, no `conf-set`.
 - Event handler thread via real `spawn`/`recv`/`send`; and the unmodified full script (autostart + forever loop) under a driver thread.
 

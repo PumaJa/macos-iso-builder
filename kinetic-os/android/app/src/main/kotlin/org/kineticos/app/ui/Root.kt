@@ -29,6 +29,7 @@ import org.kineticos.app.ui.screens.*
 import org.kineticos.app.ui.screens.LockedOverlay
 
 enum class Screen(@StringRes val label: Int, val icon: ImageVector) {
+    HOME(R.string.nav_home, Icons.Filled.Home), STATS(R.string.nav_stats, Icons.Filled.BarChart),
     DASH(R.string.nav_dash, Icons.Filled.Speed), MAP(R.string.nav_map, Icons.Filled.Map), MODES(R.string.nav_modes, Icons.Filled.Tune),
     LIVE(R.string.nav_telemetry, Icons.Filled.MonitorHeart), RIDES(R.string.nav_rides, Icons.Filled.Timeline), GROUP(R.string.nav_group, Icons.Filled.Groups),
     RACE(R.string.nav_race, Icons.Filled.Flag), GARAGE(R.string.nav_garage, Icons.Filled.TwoWheeler), CONNECT(R.string.nav_connect, Icons.Filled.Bluetooth),
@@ -39,7 +40,7 @@ enum class Screen(@StringRes val label: Int, val icon: ImageVector) {
 fun KineticRoot(activity: MainActivity) {
     val g = activity.graph
     val settings by g.settings.collectAsStateWithLifecycle()
-    var screen by rememberSaveable { mutableStateOf(Screen.DASH) }
+    var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
     var dimmed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val markerText = stringResource(R.string.toast_marker)
@@ -76,9 +77,9 @@ fun KineticRoot(activity: MainActivity) {
             if (moving) dimmed = false
         }
     }
-    LaunchedEffect(dimmed) {
+    LaunchedEffect(dimmed, settings.screenBrightness) {
         val lp = activity.window.attributes
-        lp.screenBrightness = if (dimmed) 0.02f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        lp.screenBrightness = if (dimmed) 0.02f else if (settings.screenBrightness > 0f) settings.screenBrightness else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         activity.window.attributes = lp
     }
 
@@ -101,7 +102,7 @@ fun KineticRoot(activity: MainActivity) {
                     Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
                 } else {
                     Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
-                    val primary = listOf(Screen.DASH, Screen.MAP, Screen.MODES, Screen.LIVE)
+                    val primary = listOf(Screen.HOME, Screen.DASH, Screen.MAP, Screen.MODES)
                     var more by remember { mutableStateOf(false) }
                     NavigationBar(containerColor = p.surface) {
                         primary.forEach { s -> NavigationBarItem(selected = s == screen, onClick = { screen = s }, icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
@@ -138,6 +139,8 @@ private fun ScreenHost(screen: Screen, activity: MainActivity, go: (Screen) -> U
             Screen.CONNECT -> ConnectScreen()
             Screen.REMOTE -> RemoteScreen()
             Screen.SETUP -> SetupScreen()
+            Screen.HOME -> HomeScreen(go)
+            Screen.STATS -> StatsScreen()
             Screen.SETTINGS -> SettingsScreen()
         }
     }

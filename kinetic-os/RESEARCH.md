@@ -10,7 +10,10 @@ Raw notes with all source URLs: [docs/research_raw_stark.md](docs/research_raw_s
   third-party vehicles** found. A forum report says only the Stark phone connects to the VARG.
 * Third-party community efforts exist (Svag, VargPilot, `b1naryth1ef/svag-telemetry-format` – license unstated). They target
   reading Stark bikes, not letting non-Stark vehicles join Stark services. Not used.
-* **"VargLink"**: no such project could be found or verified. Nothing was integrated; the app says so.
+* **VargLink** (varglink.com, checked 2026-11-25): independent third-party Android app (`ru.varg.link`), not made by Stark.
+  Group rides; guests without a Stark bike can join via an invite link (app or browser). No public API → Kinetic integrates
+  only by opening invite links / the app (`GroupScreen.VargLinkCard`). No data exchange, no login, no reverse engineering.
+  (Earlier search in this project had not found it.)
 * No Stark APK was supplied, so no APK analysis was performed. Analysing/redistributing a proprietary APK to clone its UI
   would not be license-compliant anyway.
 * Conclusion: original Stark group-ride compatibility = **requires an authorised external interface (EXT)**. Implemented

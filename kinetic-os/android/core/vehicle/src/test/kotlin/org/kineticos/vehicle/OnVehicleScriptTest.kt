@@ -71,3 +71,38 @@ class LockProtocolTest {
         assertIs<LockDecision.Allowed>(gate.planLock("setpin", "", "9999", status(unlocked.copy(pinSet = false)), still))
     }
 }
+
+class NeutralParentalTest {
+    private val gate = SafetyGate(clock = { 0 })
+    private val still = LiveState(0.0, 0.0, 0, true, null, null, null)
+    private fun st(neutral: Boolean? = false, parental: Double? = 1.0, locked: Boolean = false, pinSet: Boolean = true) =
+        ScriptStatus(2, 3, 0, 1, 1.0, false, false, false, 0, 30, 30, 80.0, 0, LockState(locked, pinSet, false, false, 0), neutral, parental)
+
+    @Test fun bytesAndParsing() {
+        assertEquals("4b020701", OnVehicleScript.neutral(true).joinToString("") { "%02x".format(it) })
+        assertEquals("4b0208000004d201f400009c40", OnVehicleScript.parental("1234", 0.5, 40000).joinToString("") { "%02x".format(it) })
+        val w = org.kineticos.vesc.codec.VescWriter().u8(0x4B).u8(2).u8(7).u8(0).u8(1).i16(500).u8(0).u8(0).u8(30).u8(30).i16(800).i32(0).u8(0).u8(0).u8(0b11).i16(600)
+        val s = OnVehicleScript.parseStatus(w.toByteArray())!!
+        assertEquals(true, s.neutral); assertEquals(0.6, s.parentalScale); assertTrue(s.parentalActive)
+    }
+
+    @Test fun neutralRules() {
+        assertIs<LockDecision.Allowed>(gate.planNeutral(true, st(), still.copy(speedKmh = 40.0)))          // disabling drive: always
+        assertIs<LockDecision.Denied>(gate.planNeutral(false, st(neutral = true), still.copy(speedKmh = 40.0)))
+        assertIs<LockDecision.Denied>(gate.planNeutral(false, st(neutral = true, locked = true), still))
+        assertIs<LockDecision.Allowed>(gate.planNeutral(false, st(neutral = true), still))
+        assertIs<LockDecision.Denied>(gate.planNeutral(true, st(neutral = null), still))                   // old script
+    }
+
+    @Test fun parentalRules() {
+        val moving = still.copy(speedKmh = 30.0)
+        val conf = McConfTemp(0.0, 1.0, -30000.0, 60000.0, -0.95, 0.95, -5000.0, 20000.0, -40.0, 200.0, 14, 8.0, 0.48)
+        val backup = McConfBackup("u", 0, "6.06", conf)
+        assertIs<LockDecision.Allowed>(gate.planParental("1234", 0.5, 30.0, st(parental = 0.8), backup, moving))  // lowering while moving: ok
+        assertIs<LockDecision.Denied>(gate.planParental("1234", 0.9, 30.0, st(parental = 0.5), null, moving))   // raising while moving
+        assertIs<LockDecision.Denied>(gate.planParental("1234", 1.0, null, st(parental = 0.5), null, moving))   // clearing while moving
+        assertIs<LockDecision.Allowed>(gate.planParental("1234", 1.0, null, st(parental = 0.5), null, still))
+        assertIs<LockDecision.Denied>(gate.planParental("1234", 0.5, null, st(pinSet = false), null, still))
+        assertIs<LockDecision.Denied>(gate.planParental("12", 0.5, null, st(), null, still))
+    }
+}

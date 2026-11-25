@@ -26,6 +26,9 @@
 (define pin-key 0x5A17C3E9)
 (define ea-fails  102)             ; EEPROM addr: persisted consecutive-failure count (== max-fails: lockout pending)
 (define ea-series 103)             ; EEPROM addr: persisted lockout level (0 = none; duration 60 s * 2^(level-1), cap 1 h)
+(define ea-par-pm 104)             ; EEPROM addr: parental max current scale, permille (absent/1000 = none)
+(define ea-par-e  105)             ; EEPROM addr: parental max ERPM, i32 (absent/0 = none)
+(define par-min-scale 0.05)        ; parental scale is never set below this
 (define max-fails 5)               ; consecutive wrong PINs before lockout
 (define lockout-base 60.0)         ; s, doubles per further failure series
 (define lockout-cap 3600.0)        ; s
@@ -65,6 +68,12 @@
 (define uptime 0.0)      ; seconds, advanced by derate-tick
 (define tamper 0)
 (define tamper-t 0.0)
+(define neutral 0)       ; NOT persisted: power-up = drive enabled (unless locked)
+(define par-scale 1.0)   ; parental ceiling, fraction of boot scale (1.0 = none)
+(define par-erpm 0.0)    ; parental ERPM ceiling (0.0 = none)
+(define par-dirty 0)     ; 1 = lowered while moving, EEPROM write deferred to standstill
+(define ep-par-pm 1000)  ; mirrors of the EEPROM values
+(define ep-par-e 0)
 (define lock-reassert 0)
 (define ep-cnt 0)        ; mirrors of the EEPROM values (skip identical writes)
 (define ep-series 0)
@@ -74,6 +83,12 @@
     (define locked (if (eq (eeprom-read-i ea-lock) 1) 1 0))
     (if (= locked 1) (app-disable-output -1) nil)
     (define pin-x (eeprom-read-i ea-pin))
+    ;; parental limit: loaded before any mode limit is applied
+    (define ep-par-pm (let ((v (eeprom-read-i ea-par-pm))) (if (eq v nil) 1000 v)))
+    (define ep-par-e  (let ((v (eeprom-read-i ea-par-e)))  (if (eq v nil) 0 v)))
+    (define par-scale (if (>= ep-par-pm 1000) 1.0 (kmax par-min-scale (/ (to-float ep-par-pm) 1000.0))))
+    (define par-erpm  (if (> ep-par-e 0) (to-float ep-par-e) 0.0))
+    (define par-dirty 0)
     ;; persisted PIN-failure state: a pending/active lockout restarts from boot with the
     ;; persisted duration, so power cycling can never shorten it
     (define ep-cnt (let ((v (eeprom-read-i ea-fails))) (if (eq v nil) 0 v)))
@@ -109,10 +124,11 @@
 (define vin 0.0)
 (define erpm 0.0)
 
-(defun mode-scale (i) (kmin 1.0 (ix m-scale i)))
+(defun erpm-cap () (if (> par-erpm 0.0) (kmin ceil-erpm par-erpm) ceil-erpm))
+(defun mode-scale (i) (kmin par-scale (kmin 1.0 (ix m-scale i))))
 (defun mode-watt  (i) (kmin ceil-watt (ix m-watt i)))
 (defun mode-icur  (i) (kmin ceil-icur (ix m-icur i)))
-(defun mode-erpm  (i) (kmin ceil-erpm (ix m-erpm i)))
+(defun mode-erpm  (i) (kmin (erpm-cap) (ix m-erpm i)))
 
 ;; apply mode limits (absolute ones) -- never above ceiling
 (defun apply-static ()
@@ -136,6 +152,9 @@
   (+ (if (= locked 1) 1 0)
      (+ (if (eq pin-x nil) 0 2)
         (+ (if (= tamper 1) 4 0) (if (> (lock-left) 0.0) 8 0)))))
+
+(defun par-active () (or (< par-scale 1.0) (> par-erpm 0.0)))
+(defun flags2 () (+ (if (= neutral 1) 1 0) (if (par-active) 2 0)))
 
 (defun pin-valid (p) (and (>= p 1000) (<= p 99999999)))
 (defun pin-enc (p) (bitwise-xor (to-i p) pin-key))
@@ -197,7 +216,7 @@
     (define locked 0)
     (define tamper 0)
     (define tamper-t 0.0)
-    (app-disable-output 0)
+    (if (= neutral 1) nil (app-disable-output 0))
     (apply-static)
     (define applied-scale -1.0)   ; force scale write; eff-scale (0) ramps up at step-up per tick
   })
@@ -207,7 +226,7 @@
 (define req-ver 2)       ; version byte of the request being answered (replies echo it)
 
 (defun send-status (cmd result)
-  (let ((b (bufcreate 19)))
+  (let ((b (bufcreate 22)))
     {
       (bufset-u8 b 0 proto-magic)
       (bufset-u8 b 1 req-ver)
@@ -223,6 +242,8 @@
       (bufset-i32 b 13 (rnd erpm))
       (bufset-u8 b 17 (lock-flags))
       (bufset-u8 b 18 (lock-left-u8))
+      (bufset-u8 b 19 (flags2))
+      (bufset-u16 b 20 (rnd (* par-scale 1000.0)))
       (send-data b)
     }))
 
@@ -259,10 +280,10 @@
             {
                   ;; params may be edited anytime for non-active slot; if slot is
                   ;; active, new values must not be more powerful unless stationary
-                  (let ((ns (clamp (/ (to-float (bufget-u16 d 4)) 1000.0) 0.0 1.0))
+                  (let ((ns (clamp (/ (to-float (bufget-u16 d 4)) 1000.0) 0.0 par-scale))
                         (nw (kmin ceil-watt (to-float (if (= req-ver 1) (bufget-u16 d 6) (bufget-u32 d 6)))))
                         (ni (kmin ceil-icur (/ (to-float (bufget-u16 d (if (= req-ver 1) 8 10))) 10.0)))
-                        (ne (kmin ceil-erpm (to-float (bufget-u32 d (if (= req-ver 1) 10 12))))))
+                        (ne (kmin (erpm-cap) (to-float (bufget-u32 d (if (= req-ver 1) 10 12))))))
                     (if (and (= idx cur-mode) (>= (abs erpm) stop-erpm)
                              (or (> ns (mode-scale idx)) (> nw (mode-watt idx))
                                  (> ni (mode-icur idx)) (> ne (mode-erpm idx))))
@@ -331,6 +352,62 @@
                           (send-status 6 0)
                         })))))))
 
+(defun handle-neutral (d)
+  (if (< (buflen d) 4)
+      (reject 7 4)
+      (let ((on (bufget-u8 d 3)))
+        (cond
+          ((= on 1) { (define neutral 1) (app-disable-output -1) (define last-reject 0) (send-status 7 0) })
+          ((= on 0)
+           (if (= locked 1)
+               (reject 7 11)
+               (if (moving)
+                   (reject 7 3)
+                   { (define neutral 0) (app-disable-output 0) (define last-reject 0) (send-status 7 0) })))
+          (t (reject 7 2))))))
+
+;; write the parental limit to EEPROM (only changed cells); only called at standstill
+(defun persist-par ()
+  {
+    (let ((pm (if (< par-scale 1.0) (rnd (* par-scale 1000.0)) 1000))
+          (e  (if (> par-erpm 0.0) (rnd par-erpm) 0)))
+      {
+        (if (not (= pm ep-par-pm)) { (eeprom-store-i ea-par-pm pm) (define ep-par-pm pm) } nil)
+        (if (not (= e ep-par-e)) { (eeprom-store-i ea-par-e e) (define ep-par-e e) } nil)
+      })
+    (define par-dirty 0)
+  })
+
+(defun par-e-val (e) (if (> e 0.0) e 1000000000.0))
+
+;; cmd 8: [3..6] pin u32, [7..8] max scale permille u16, [9..12] max erpm u32
+;; Lowering while moving: PIN checked WITHOUT counting/EEPROM, applied at once, EEPROM write deferred to standstill.
+;; Raising/clearing while moving: code 3. Stationary: normal counted PIN check.
+(defun handle-parental (d)
+  (if (< (buflen d) 13)
+      (reject 8 4)
+      (if (eq pin-x nil)
+          (reject 8 8)
+          (if (= locked 1)
+              (reject 8 11)
+              (let ((pm (bufget-u16 d 7))
+                    (ne (let ((e (to-float (bufget-u32 d 9)))) (kmin 2147483000.0 e))))
+                (let ((ns (if (>= pm 1000) 1.0 (kmax par-min-scale (/ (to-float pm) 1000.0)))))
+                  (let ((lowering (and (<= ns par-scale) (<= (par-e-val ne) (par-e-val par-erpm))))
+                        (r (if (moving) (if (> lock-until uptime) 9 (if (pin-ok (bufget-u32 d 3)) 0 7)) (check-pin (bufget-u32 d 3)))))
+                    (if (and (moving) (not lowering))
+                        (reject 8 3)
+                        (if (not (= r 0))
+                            (reject 8 r)
+                            {
+                              (define par-scale ns)
+                              (define par-erpm ne)
+                              (apply-static)
+                              (if (moving) (define par-dirty 1) (persist-par))
+                              (define last-reject 0)
+                              (send-status 8 0)
+                            })))))))))
+
 (defun proc-data (d)
   (if (and (>= (buflen d) 3)
            (= (bufget-u8 d 0) proto-magic)
@@ -345,6 +422,8 @@
           ((= cmd 4) (handle-lock d))
           ((= cmd 5) (handle-unlock d))
           ((= cmd 6) (handle-set-pin d))
+          ((= cmd 7) (handle-neutral d))
+          ((= cmd 8) (handle-parental d))
             (t (reject cmd 5)))
         })
       nil))   ; wrong magic / version not 1 or 2: silently ignored (could be other app data)
@@ -386,6 +465,8 @@
     (define vin (get-vin))
     (define erpm (get-rpm))
     (define uptime (+ uptime loop-dt))
+    (if (and (= par-dirty 1) (not (moving))) (persist-par) nil)
+    (if (= neutral 1) (app-disable-output -1) nil)
     (if (= locked 1) (lock-tick) (derate-apply))
   })
 

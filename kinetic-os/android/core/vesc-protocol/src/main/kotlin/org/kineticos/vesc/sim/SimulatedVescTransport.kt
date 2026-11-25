@@ -50,6 +50,8 @@ class SimulatedVescTransport(
     private var lastReject = 0
     // emulated immobilizer (RAM only in the simulator; the real script persists it in EEPROM)
     var locked = false; private set
+    var neutral = false; private set
+    private var parentalScale = 1.0; private var parentalErpm = 0.0
     private var pin: Long? = null
     private var fails = 0; private var lockoutUntil = 0L; private var lockoutS = 60L
     var tamper = false; private set
@@ -63,9 +65,10 @@ class SimulatedVescTransport(
         val lockedOut = clock() < lockoutUntil
         w.u8((if (locked) 1 else 0) or (if (pin != null) 2 else 0) or (if (tamper) 4 else 0) or (if (lockedOut) 8 else 0))
         w.u8(if (lockedOut) ((lockoutUntil - clock()) / 1000).toInt().coerceIn(0, 255) else 0)
+        w.u8((if (neutral) 1 else 0) or (if (parentalScale < 1.0 || parentalErpm > 0) 2 else 0)).i16((parentalScale * 1000).toInt())
         return w.toByteArray()
     }
-    private fun applyMode(m: SMode) { maxScale = m.scale.coerceAtMost(ceilScale); wattMax = m.watt.coerceAtMost(ceilWatt); maxErpm = m.erpm.coerceAtMost(ceilErpm) }
+    private fun applyMode(m: SMode) { maxScale = minOf(m.scale.coerceAtMost(ceilScale), parentalScale); wattMax = m.watt.coerceAtMost(ceilWatt); maxErpm = minOf(m.erpm, ceilErpm, if (parentalErpm > 0) parentalErpm else Double.MAX_VALUE) }
     private fun handleScript(d: ByteArray): ByteArray? {
         if (d.size < 3 || (d[0].toInt() and 0xFF) != 0x4B) return null
         val ver = d[1].toInt() and 0xFF; if (ver !in 1..2) return null
@@ -86,6 +89,11 @@ class SimulatedVescTransport(
                 when { clock() < lockoutUntil -> 9
                     p != pin -> { fails++; if (fails >= 5) { lockoutUntil = clock() + lockoutS * 1000; lockoutS = (lockoutS * 2).coerceAtMost(3600); fails = 0 }; 7 }
                     else -> { locked = false; tamper = false; fails = 0; lockoutS = 60; applyMode(sModes[scriptMode]); 0 } } }
+            7 -> if (d.size < 4) 4 else { val on = r.u8() != 0
+                when { on -> { neutral = true; 0 }; locked -> 11; moving -> 3; else -> { neutral = false; 0 } } }
+            8 -> if (d.size < 13) 4 else { val p = r.u32(); val sc = r.u16() / 1000.0; val er = r.u32().toDouble()
+                when { pin == null -> 8; p != pin -> 7; moving && (sc > parentalScale || (er == 0.0 && parentalErpm > 0)) -> 3
+                    else -> { parentalScale = sc.coerceIn(0.05, 1.0); parentalErpm = er; applyMode(sModes[scriptMode]); 0 } } }
             6 -> if (d.size < 11) 4 else { val old = r.u32(); val new = r.u32()
                 when { locked -> 11; pin != null && old != pin -> 7; new !in 1000L..99_999_999L -> 10; else -> { pin = new; 0 } } }
             else -> 5
@@ -100,7 +108,7 @@ class SimulatedVescTransport(
     fun step() {
         val now = clock(); val dt = ((now - lastStep).coerceIn(0, 1000)) / 1000.0; lastStep = now
         val time = (now - t0) / 1000.0
-        throttle = if (locked) 0.0 else manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
+        throttle = if (locked || neutral) 0.0 else manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
         val target = throttle * maxScale * maxErpm * 0.8
         erpm += (target - erpm) * min(1.0, dt * 0.8)
         if (locked) {

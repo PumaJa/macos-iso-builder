@@ -76,9 +76,15 @@ class GalleryTest {
         // 1) ride with the simulated vehicle (incl. emulated vehicle script) so rides/telemetry have data
         g.connectTo("sim-script")
         waitFor { g.connection.status.value is ConnStatus.Online && g.connection.backup.value != null && g.connection.drivetrain.gearRatio == 8.0 }
-        pump(8000)
+        pump(5000)
+        // simulated jumps via the (injected) accelerometer – the phone sensor path is the same in real use
+        var tj = System.currentTimeMillis()
+        repeat(4) { k -> fun feed(gv: Double, ms: Long) { val e = tj + ms; while (tj < e) { g.motion.inject(tj, gv); tj += 10 } }
+            feed(1.0, 400); feed(0.12, 500L + k * 250); feed(2.2 + k * 0.4, 60); feed(1.0, 400); pump(700) }
+        pump(3000)
         runBlocking { g.applyProfile(RideProfile.ECO) }
         pump(6000)
+        open("HOME", 4000); shot("00_start")
         open("DASH"); shot("01_cockpit")
         open("LIVE"); shot("02_telemetrie")
         open("MODES"); shot("03_fahrmodi")
@@ -96,6 +102,10 @@ class GalleryTest {
         val end = System.currentTimeMillis() + 20_000
         while (compose.onAllNodesWithText("TEMPO", substring = true).fetchSemanticsNodes().isEmpty() && System.currentTimeMillis() < end) pump(300)
         pump(1000); shot("12_fahrt_detail")
+        open("STATS")
+        // only simulator rides exist here → explicitly include them (they stay labelled as simulated)
+        compose.onAllNodes(isToggleable())[0].performClick(); pump(1500); compose.waitForIdle()
+        shot("12b_statistik_gesamt")
         // themes
         g.connectTo("sim"); waitFor { g.connection.sample.value != null }; pump(4000)
         runBlocking { g.settingsRepo.update { it.copy(theme = ThemeMode.DAY) } }; open("DASH"); shot("13_cockpit_tag")

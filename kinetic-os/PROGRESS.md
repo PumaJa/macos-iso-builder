@@ -25,3 +25,4 @@
 | 2026-11-25 | Anti-theft lock (LispBM via subagent + app/server/sim) | 223+9 LispBM, 145 Android, 52 server green; vescpkg rebuilt |
 | 2026-11-25 | German UI (subagent), code review (subagent, 19 findings) → safety fixes, PIN lockout persisted (subagent), release signing + ABI splits | all suites green |
 | 2026-11-25 | Full test run + gallery (17 screens), emulator, web dashboard with data; swipe mode change + curve point editor | all green; 3 bugs found & fixed |
+| 2026-11-25 | Stark feature set from user images: home, stats (airtime/g-force), M1–M5 with PS/kW, riding time, neutral, parental lock, brightness, FR/IT/ES/SV (subagent), VargLink invite links | all green (see TEST_RESULTS) |

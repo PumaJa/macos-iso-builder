@@ -76,7 +76,10 @@ fun DashScreen(go: (Screen) -> Unit) {
             Pill(txt, col, Modifier.padding(end = 6.dp))
             Pill(if (gpsFix != null) stringResource(R.string.dash_gps, gpsFix!!.accuracyM ?: 0.0) else stringResource(R.string.dash_no_gps), if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
             if (rec != null) Pill(stringResource(R.string.dash_rec), K.Danger)
+            g.connection.engine?.movingTimeMs?.takeIf { status is ConnStatus.Online }?.let { ms ->
+                Pill("⏱ %dh %02dm".format(ms / 3_600_000, ms / 60_000 % 60), p.textDim, Modifier.padding(start = 6.dp)) }
             Spacer(Modifier.weight(1f))
+            NeutralPill()
             LockPill()
             Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(22), color = p.text)
         }

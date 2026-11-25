@@ -43,7 +43,7 @@ lispbm/kinetic.lisp — runs on the VESC: mode table, local temperature/voltage 
 | Data Recording | `app/.../core/RideRecorder.kt`, Room `data/Db.kt`, `core/export` |
 | Navigation | `app/.../nav`, `ui/screens/MapScreen.kt` (MapLibre + OpenFreeMap/OSM) |
 | Multiplayer | `app/.../net/LiveSocket.kt`, `GroupScreen.kt`, `server/` |
-| Stark Compatibility / VargLink Integration | `GroupScreen.StarkCompatCard` – status screen only (no authorised interface exists) |
+| Stark Compatibility / VargLink Integration | `GroupScreen.StarkCompatCard` (status only, no authorised Stark interface) + `GroupScreen.VargLinkCard` (opens VargLink invite links/app; no API) |
 | Telematics | `AppGraph.telematicsLoop`, `net/Telematics.kt`, `RemoteScreen.kt`, server `/telematics` |
 | Cloud Backend / Web Dashboard | `server/` |
 | Security | `core/vehicle/SafetyGate.kt`, `WriteToken`, `SECURITY.md`, server auth/access logic |
