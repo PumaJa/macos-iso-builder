@@ -35,3 +35,5 @@
 27. **Power display in PS/kW** in ride modes is derived from the backed-up `l_watt_max` of the controller, not a dyno value.
 28. **Greyscale UI:** status is shown by brightness, labels and icons instead of colour (user wish). Simulation is still always marked with the SIM banner/tags. Map lines are grey/white and can be hard to see on light map styles.
 29. **Custom logo/background** images are stored only on the phone (app storage); they are not synced to the server or other phones.
+30. **Traction control is experimental and not hardware-validated.** It detects wheel spin from the ERPM rise rate (no wheel-speed sensor); `tc-max-erpm-rate` in kinetic.lisp must be tuned per vehicle on a stand. It can only reduce current; airborne detection needs a VESC with IMU (without IMU TC also works on landing/air, which is harmless but may cut power on take-off).
+31. **Charging display** only works when charging current flows through the VESC or a VESC BMS reports it; chargers connected directly to the battery are invisible to the app (nothing is guessed).

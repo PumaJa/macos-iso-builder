@@ -106,3 +106,40 @@ class NeutralParentalTest {
         assertIs<LockDecision.Denied>(gate.planParental("12", 0.5, null, st(), null, still))
     }
 }
+
+class TractionControlTest {
+    private val gate = SafetyGate(clock = { 0 })
+    private val still = LiveState(0.0, 0.0, 0, true, null, null, null)
+    private val moving = LiveState(20000.0, 40.0, 0, true, null, null, null)
+    private fun st(tc: Int?) = ScriptStatus(2, 3, 0, 1, 1.0, false, false, false, 0, 30, 30, 80.0, 0, null, false, 1.0, tc, false, false)
+
+    @Test fun bytesAndParsing() {
+        assertContentEquals(byteArrayOf(0x4B, 2, 9, 40), OnVehicleScript.traction(40))
+        assertFailsWith<IllegalArgumentException> { OnVehicleScript.traction(101) }
+        // 24-byte reply: bytes 22 = TC %, 23 = flags3 (bit0 intervening, bit1 airborne)
+        val base = ByteArray(22).also { it[0] = 0x4B; it[1] = 2; it[2] = 9 }
+        val s = OnVehicleScript.parseStatus(base + byteArrayOf(60, 0b11))!!
+        assertEquals(60, s.tcPercent); assertEquals(true, s.tcActive); assertEquals(true, s.airborne)
+        // older 22-byte reply → TC unknown (null), not "0 %"
+        assertNull(OnVehicleScript.parseStatus(base)!!.tcPercent)
+    }
+
+    @Test fun gateRules() {
+        // no script / too old
+        assertIs<LockDecision.Denied>(gate.planTraction(40, null, still))
+        assertIs<LockDecision.Denied>(gate.planTraction(40, st(null), still))
+        // more intervention is always fine, also while riding
+        assertIs<LockDecision.Allowed>(gate.planTraction(60, st(20), moving))
+        // less intervention only at standstill; unknown speed counts as moving
+        assertIs<LockDecision.Denied>(gate.planTraction(10, st(40), moving))
+        assertIs<LockDecision.Denied>(gate.planTraction(10, st(40), still.copy(speedKmh = null)))
+        assertIs<LockDecision.Allowed>(gate.planTraction(0, st(40), still))
+        assertIs<LockDecision.Denied>(gate.planTraction(120, st(40), still))
+    }
+
+    @Test fun directModeWritesNeverClaimTractionControl() {
+        val d = gate.planRideMode(null, null, null, RideProfile.ECO.copy(tractionControl = 0.5), VehicleProfile("v", "V"), still)
+        assertIs<GateDecision.Denied>(d)
+        assertTrue(d.reasons.any { "vehicle script" in it })
+    }
+}

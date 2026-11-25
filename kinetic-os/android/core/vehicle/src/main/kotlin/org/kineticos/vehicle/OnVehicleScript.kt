@@ -18,6 +18,10 @@ data class ScriptStatus(
     /** Neutral (drive disabled) and parental limit (reply bytes 19–21; null = older script). */
     val neutral: Boolean? = null,
     val parentalScale: Double? = null,
+    /** Traction control (reply bytes 22–23; null = script without TC). */
+    val tcPercent: Int? = null,
+    val tcActive: Boolean? = null,
+    val airborne: Boolean? = null,
 ) {
     val parentalActive get() = parentalScale != null && parentalScale < 1.0
     val derating get() = derateMosfet || derateMotor || derateVoltage
@@ -46,6 +50,8 @@ object OnVehicleScript {
     fun lock(pin: String): ByteArray { require(validPin(pin)); return base(4).u32(pin.toLong()).toByteArray() }
     fun unlock(pin: String): ByteArray { require(validPin(pin)); return base(5).u32(pin.toLong()).toByteArray() }
     fun neutral(on: Boolean): ByteArray = base(7).u8(if (on) 1 else 0).toByteArray()
+    /** cmd 9: traction-control intervention 0..100 % (0 = off). The script can only reduce current with it. */
+    fun traction(percent: Int): ByteArray { require(percent in 0..100); return base(9).u8(percent).toByteArray() }
     /** Parental ceiling (PIN-protected). scale 1.0 and maxErpm 0 clear it. */
     fun parental(pin: String, maxScale: Double, maxErpm: Long): ByteArray {
         require(validPin(pin)); return base(8).u32(pin.toLong()).i16((maxScale.coerceIn(0.05, 1.0) * 1000).toInt()).u32(maxErpm.coerceIn(0, 0xFFFFFFFFL)).toByteArray()
@@ -70,11 +76,13 @@ object OnVehicleScript {
         val lock = if (r.remaining >= 2) { val lf = r.u8(); LockState(lf and 1 != 0, lf and 2 != 0, lf and 4 != 0, lf and 8 != 0, r.u8()) } else null
         var neutral: Boolean? = null; var parental: Double? = null
         if (r.remaining >= 3) { val f2 = r.u8(); neutral = f2 and 1 != 0; val ps = r.u16() / 1000.0; parental = if (f2 and 2 != 0) ps else 1.0 }
-        return ScriptStatus(ver, cmd, res, mode, scale, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, rej, tm, tmo, v, erpm, lock, neutral, parental)
+        var tc: Int? = null; var tcAct: Boolean? = null; var air: Boolean? = null
+        if (r.remaining >= 2) { tc = r.u8().coerceIn(0, 100); val f3 = r.u8(); tcAct = f3 and 1 != 0; air = f3 and 2 != 0 }
+        return ScriptStatus(ver, cmd, res, mode, scale, flags and 1 != 0, flags and 2 != 0, flags and 4 != 0, rej, tm, tmo, v, erpm, lock, neutral, parental, tc, tcAct, air)
     }
 
     fun resultText(code: Int) = when (code) {
-        0 -> "OK"; 2 -> "bad mode index"; 3 -> "vehicle moving – power increase refused by the vehicle"
+        0 -> "OK"; 2 -> "bad mode index or value"; 3 -> "vehicle moving – power increase refused by the vehicle"
         4 -> "packet too short"; 5 -> "unknown command"; 6 -> "invalid slot"; 7 -> "wrong PIN"; 8 -> "no PIN set yet"
         9 -> "too many wrong PINs – wait"; 10 -> "PIN must be 4–8 digits"; 11 -> "vehicle is locked"; else -> "code $code"
     }
@@ -90,7 +98,8 @@ fun SafetyGate.planScriptMode(
     fw: org.kineticos.vesc.model.FirmwareInfo?, backup: McConfBackup?, current: RideProfile?, target: RideProfile, vehicle: VehicleProfile,
     live: LiveState, activeSlot: Int?,
 ): ScriptDecision {
-    val d = planRideMode(fw, backup, current, target, vehicle, live, 1.0) // script does its own derating
+    // Traction control is executed by the vehicle script (it can only reduce current) and is sent separately (planTraction).
+    val d = planRideMode(fw, backup, current?.copy(tractionControl = 0.0), target.copy(tractionControl = 0.0), vehicle, live, 1.0) // script does its own derating
     if (d is GateDecision.Denied) return ScriptDecision.Denied(d.reasons)
     d as GateDecision.Allowed
     val b = backup!!.conf
@@ -157,6 +166,22 @@ fun SafetyGate.planNeutral(on: Boolean, status: ScriptStatus?, live: LiveState, 
         if (speed > stationaryKmh) return LockDecision.Denied("Leaving neutral is only possible at standstill")
     }
     return LockDecision.Allowed(OnVehicleScript.wrap(OnVehicleScript.neutral(on)), WriteToken.issue("SafetyGate", "neutral $on"))
+}
+
+/**
+ * Traction control on the vehicle (cmd 9). More intervention is always allowed (it can only reduce power);
+ * less intervention only at standstill (like any power increase).
+ */
+fun SafetyGate.planTraction(percent: Int, status: ScriptStatus?, live: LiveState, stationaryKmh: Double = 2.0): LockDecision {
+    val st = status ?: return LockDecision.Denied("Traction control needs the vehicle script (kinetic.vescpkg)")
+    val cur = st.tcPercent ?: return LockDecision.Denied("Installed script is too old for traction control – update kinetic.vescpkg")
+    if (percent !in 0..100) return LockDecision.Denied("Traction control must be 0–100 %")
+    if (!live.linkHealthy) return LockDecision.Denied("Link unstable")
+    if (percent < cur) {
+        val speed = live.speedKmh ?: return LockDecision.Denied("Speed unknown – less traction control only at standstill")
+        if (speed > stationaryKmh) return LockDecision.Denied("Less traction control only at standstill")
+    }
+    return LockDecision.Allowed(OnVehicleScript.wrap(OnVehicleScript.traction(percent)), WriteToken.issue("SafetyGate", "traction $percent"))
 }
 
 /** Parental limit: PIN-protected ceiling on the vehicle. Lowering always allowed; raising/clearing only at standstill. */

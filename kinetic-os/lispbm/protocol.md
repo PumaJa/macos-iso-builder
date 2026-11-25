@@ -8,7 +8,7 @@ Transport: VESC `COMM_CUSTOM_APP_DATA` (phone -> VESC arrives in LispBM as `even
 |---|---|---|
 | 0 | magic | 0x4B ('K') |
 | 1 | version | 2 (current) or 1 (legacy cmd 2 layout) |
-| 2 | command | 1 set mode, 2 set custom params, 3 status request, 4 lock, 5 unlock, 6 set PIN, 7 neutral, 8 parental limit |
+| 2 | command | 1 set mode, 2 set custom params, 3 status request, 4 lock, 5 unlock, 6 set PIN, 7 neutral, 8 parental limit, 9 traction control |
 
 ### cmd 1 - set mode (length 4)
 | 3 | mode index | 0 eco, 1 sport, 2 race, 3 custom1, 4 custom2 |
@@ -66,9 +66,14 @@ On: `app-disable-output -1` (throttle ignored, motor freewheels, no brake curren
 
 Persistent ceiling stored in EEPROM and loaded at boot before modes are applied. Effective ceiling = min(boot ceiling, parental) for every mode and for custom params (stored custom values are clamped when set; raising the parental limit later does not restore them). Needs the lock PIN: code 8 if none set, 7/9 as for cmd 4-6, 11 while locked. Stationary: normal counted PIN check, any change allowed, EEPROM written at once. Moving: only a reduction (both values not above the current ones) is accepted; it takes effect immediately, the PIN is checked without counting or EEPROM writes (wrong: code 7, lockout active: 9), and the EEPROM write is deferred until standstill. Raising or clearing while moving: code 3 (nothing counted or written). `1000` + `0` clears the limit.
 
+### cmd 9 - traction control (length 4) - EXPERIMENTAL
+| 3 | intervention percent | u8, 0..100 (0 = off) |
+
+Off by default, RAM only (0 after boot; the phone re-sends it with every mode change). It can only ever reduce motor current: the applied current scale is `min(mode/derate/rate-limit/parental scale, tc scale)`. Raising the intervention is always accepted (also while locked). Lowering it while |ERPM| >= the stop threshold is rejected with code 3; while locked it is accepted. Value > 100: code 2. Length < 4: code 4. On success the reply is the normal status reply (byte 22 = new percent).
+
 While locked, cmd 1 and cmd 2 are refused with code 11; cmd 3 (status) is always answered.
 
-## Reply (VESC -> phone), 22 bytes. Sent after every accepted/rejected cmd 1-3.
+## Reply (VESC -> phone), 24 bytes. Sent after every accepted/rejected command.
 
 | Byte | Field | Type / notes |
 |---|---|---|
@@ -89,16 +94,18 @@ While locked, cmd 1 and cmd 2 are refused with code 11; cmd 3 (status) is always
 
 | 19 | flags2 | u8: bit0 neutral, bit1 parental limit active |
 | 20-21 | parental max current scale, permille | u16, 1000 when no scale limit |
+| 22 | traction control percent | u8, 0 = off |
+| 23 | flags3 | u8: bit0 TC currently intervening (tc scale < 0.999), bit1 airborne detected (needs IMU; always 0 when TC is off or there is no IMU) |
 
-Bytes 0-16 are identical to the original 17-byte reply and bytes 0-18 to the 19-byte one, so old parsers that read only those still work.
+Bytes 0-16 are identical to the original 17-byte reply, bytes 0-18 to the 19-byte one and bytes 0-21 to the 22-byte one, so old parsers that read only those still work.
 
 ## Reject / result codes
 | Code | Meaning |
 |---|---|
 | 0 | OK |
-| 2 | bad mode index |
-| 3 | vehicle moving (|ERPM| >= threshold) and request would increase power; also cmd 4/5/6 while moving |
-| 4 | packet too short |
+| 2 | bad mode index / bad value (neutral not 0/1, TC percent > 100) |
+| 3 | vehicle moving (|ERPM| >= threshold) and request would increase power (cmd 9: would lower TC intervention); also cmd 4/5/6 while moving |
+| 4 | packet too short (incl. cmd 9 shorter than 4) |
 | 5 | unknown command |
 | 6 | cmd 2 slot not 3 or 4 |
 | 7 | wrong PIN |

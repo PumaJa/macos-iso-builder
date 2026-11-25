@@ -70,7 +70,25 @@ fun HomeScreen(go: (Screen) -> Unit) {
             }
         }
     }
+    // Charging through the controller / VESC BMS: measured negative battery current at standstill. Chargers that bypass
+    // the controller are invisible to the VESC – then nothing is shown (never guessed).
+    val charging = s?.let { smp -> val i = smp.batteryCurrentA; val v = smp.speedMps.value ?: 0.0
+        i.isAvailable && i.quality != org.kineticos.telemetry.Quality.SIMULATED && i.value!! < -0.5 && v < 0.3 } == true
     val numbers: @Composable () -> Unit = {
+        if (charging) {
+            val pw = -(s?.batteryPowerW?.value ?: 0.0)
+            val soc = s?.socPct?.value
+            val eta = vehicle?.batteryWh?.let { wh -> soc?.let { (100 - it) / 100 * wh / pw.coerceAtLeast(1.0) } }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(16.dp)).background(p.surface).border(1.dp, p.grid, RoundedCornerShape(16.dp)).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.BatteryChargingFull, null, tint = p.text, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.home_charging), style = titleStyle(20), color = p.text)
+                    Text("%.1f kW".format(pw / 1000) + (eta?.let { " · " + stringResource(R.string.home_charging_eta, it.toInt(), (it * 60 % 60).toInt()) } ?: ""), style = labelStyle(10), color = p.textDim)
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(20.dp)).background(p.surface).padding(vertical = 14.dp, horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically) {
             val soc = s?.socPct

@@ -146,5 +146,14 @@ fun SettingsScreen() {
         Text(if (s.authToken != null) stringResource(R.string.set_signed_in, s.username ?: "") else stringResource(R.string.set_not_signed_in), color = p.textDim)
         SectionTitle(stringResource(R.string.set_about))
         Text(stringResource(R.string.set_about_text, BuildConfig.VERSION_NAME), color = p.textDim, style = labelStyle(10))
+        Text(stringResource(R.string.set_version_history), color = p.textDim, style = labelStyle(11), modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+        val history = remember { VersionHistory.entries(ctx).reversed() }
+        val df = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
+        Card(Modifier.fillMaxWidth()) {
+            history.forEach { e -> Row(Modifier.padding(vertical = 3.dp)) {
+                Text(df.format(java.util.Date(e.ts)), color = p.textDim, style = labelStyle(10), modifier = Modifier.width(120.dp))
+                Text("App ${e.app}" + (e.firmware?.let { " · VESC FW $it" } ?: "") + (e.hardware?.let { " · $it" } ?: ""), color = p.text, style = labelStyle(10))
+            } }
+        }
     }
 }

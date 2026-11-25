@@ -15,6 +15,8 @@
 (define stub-mot 25.0)
 (define stub-vin 50.0)
 (define stub-rpm 0.0)
+(define stub-cur 0.0)         ; motor current (A) for get-current
+(define stub-imu nil)         ; nil = no IMU (get-imu-acc errors), else list (x y z) in g
 (define stub-sent nil)        ; buffers passed to send-data, newest first
 (define stub-conf-log nil)    ; (key . value) for every conf-set, newest first
 (define stub-events nil)
@@ -40,6 +42,8 @@
 (defun get-temp-mot () stub-mot)
 (defun get-vin () stub-vin)
 (defun get-rpm () stub-rpm)
+(defun get-current () stub-cur)
+(defun get-imu-acc () (if (eq stub-imu nil) (exit-error 'no-imu) stub-imu))
 
 (defun send-data (b)
   {

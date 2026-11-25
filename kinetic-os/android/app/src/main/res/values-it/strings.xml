@@ -602,4 +602,10 @@
     <string name="set_tile_images_reset">Ripristina foto dei riquadri</string>
     <string name="set_text_scale">Dimensione testo</string>
     <string name="race_accuracy_note">A %1$.0f Hz un passaggio è noto solo a ±%2$.2f s; l’interpolazione lo migliora a circa ±%3$.2f s (precisione GPS %4$s). Stima, cronometraggio non certificato.</string>
+    <string name="edit_traction_hint">Funziona sul veicolo (script): riduce la corrente motore se la ruota posteriore slitta, disattivo in volo. Può solo ridurre la potenza. Meno intervento solo da fermo.</string>
+    <string name="modes_row_tc"> · TC %1$d %%</string>
+    <string name="tc_pill">TC %1$d</string>
+    <string name="set_version_history">Cronologia versioni (app · veicolo)</string>
+    <string name="home_charging">In carica</string>
+    <string name="home_charging_eta">carico tra %1$d:%2$02d h</string>
 </resources>

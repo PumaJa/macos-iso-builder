@@ -602,4 +602,10 @@
     <string name="set_tile_images_reset">Kachelfotos zurücksetzen</string>
     <string name="set_text_scale">Textgröße</string>
     <string name="race_accuracy_note">Bei %1$.0f Hz ist ein Linienübertritt nur auf ±%2$.2f s bekannt; Interpolation verbessert das auf ca. ±%3$.2f s (GPS-Genauigkeit %4$s). Schätzung, keine zertifizierte Zeitmessung.</string>
+    <string name="edit_traction_hint">Läuft auf dem Fahrzeug (Skript): reduziert den Motorstrom, wenn das Hinterrad durchdreht, in der Luft aus. Kann nur Leistung wegnehmen. Weniger Eingriff nur im Stand.</string>
+    <string name="modes_row_tc"> · TC %1$d %%</string>
+    <string name="tc_pill">TC %1$d</string>
+    <string name="set_version_history">Versionsverlauf (App · Fahrzeug)</string>
+    <string name="home_charging">Lädt</string>
+    <string name="home_charging_eta">voll in %1$d:%2$02d h</string>
 </resources>

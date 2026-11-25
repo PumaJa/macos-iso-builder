@@ -97,7 +97,7 @@ open class GalleryTest {
         repeat(4) { k -> fun feed(gv: Double, ms: Long) { val e = tj + ms; while (tj < e) { g.motion.inject(tj, gv); tj += 10 } }
             feed(1.0, 400); feed(0.12, 500L + k * 250); feed(2.2 + k * 0.4, 60); feed(1.0, 400); pump(700) }
         pump(3000)
-        runBlocking { g.applyProfile(RideProfile.ECO) }
+        runBlocking { g.applyProfile(RideProfile.ECO.copy(tractionControl = 0.3)) }
         pump(6000)
         open("HOME", 7000); shot("00_start")
         open("DASH"); shot("01_cockpit")

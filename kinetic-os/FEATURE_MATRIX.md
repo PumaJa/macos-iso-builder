@@ -149,6 +149,10 @@ erforderlich · **NS** = Nicht unterstützt.
 | Querformat (Lenkerhalterung): 3-spaltiges Cockpit, geteilte Startseite; Ausrichtung Quer/Hoch/Auto | IT (Render quer + hoch) |
 | Personalisierung: Hintergrundbild + Abdunklung, eigenes Logo, eigener Name, Akzent-Helligkeit | IT (Render) / IH (Bildauswahl) |
 | Sperrbildschirm: animierter Sicherheitsring, Alarmbalken bei Bewegung, PIN-Feld direkt auf dem Bildschirm | IT (Render, Simulator-E2E) |
+| Traktionskontrolle pro Modus 0–100 % (im Fahrzeugskript, nur Strom-Reduktion, in der Luft aus, „TC“-Anzeige im Cockpit) | IT (Simulator-E2E, LispBM-Interpreter 337 Tests) / experimentell, nicht auf Hardware validiert |
+| Versionsverlauf App · VESC-Firmware/Hardware (Einstellungen → Info) | IT |
+| Mindestleistung für Fahrmodi (5 %) | IT |
+| Ladeanzeige (Leistung, voll in …), nur wenn der VESC/BMS den Ladestrom misst | IH |
 | Firmware-Update über WLAN | bewusst nicht (Brick-Risiko) – VESC Tool verwenden |
 | Map-Switch-LED | nicht anwendbar (Stark-Hardware) |
 

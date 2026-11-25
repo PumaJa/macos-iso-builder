@@ -213,6 +213,20 @@ fun LockDialog(close: () -> Unit) {
     })
 }
 
+/** Traction-control indicator: shows the intervention level; filled while the vehicle script is intervening. */
+@Composable
+fun TcPill() {
+    val g = LocalContext.current.graph
+    val st by g.connection.scriptStatus.collectAsStateWithLifecycle()
+    val pct = st?.tcPercent?.takeIf { it > 0 } ?: return
+    val active = st?.tcActive == true && st?.airborne != true
+    Box(Modifier.padding(end = 6.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+        .background(if (active) K.Accent else Color.Transparent).border(1.dp, if (active) K.Accent else LocalPalette.current.grid, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+        .padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(stringResource(R.string.tc_pill, pct), style = labelStyle(11), color = if (active) K.OnAccent else LocalPalette.current.text)
+    }
+}
+
 /** "N" toggle (neutral): only shown when the vehicle script supports it. */
 @Composable
 fun NeutralPill() {

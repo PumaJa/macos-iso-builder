@@ -65,7 +65,8 @@ fun ModesScreen() {
                         Text(pr.name, style = labelStyle(16), color = if (applied?.id == pr.id) K.Accent else p.text)
                         Text(stringResource(R.string.modes_row, pr.powerFraction * 100, pr.motorCurrentFraction * 100, pr.batteryCurrentFraction * 100, pr.regenFraction * 100,
                             pr.speedLimitKmh?.let { stringResource(R.string.modes_row_speed, it) } ?: ""), color = p.textDim, style = labelStyle(10))
-                        Text(pr.character.uiLabel() + if (pr.character.approximate) stringResource(R.string.modes_approx) else "", color = p.textDim, style = labelStyle(10))
+                        Text(pr.character.uiLabel() + (if (pr.character.approximate) stringResource(R.string.modes_approx) else "") +
+                            (if (pr.tractionControl > 0) stringResource(R.string.modes_row_tc, (pr.tractionControl * 100).toInt()) else ""), color = p.textDim, style = labelStyle(10))
                     }
                     CurvePreview(pr, Modifier.size(90.dp, 54.dp))
                 }
@@ -109,7 +110,7 @@ private fun ProfileEditor(initial: RideProfile, onDone: (RideProfile?) -> Unit) 
             SectionTitle(stringResource(R.string.edit_title))
             Field(stringResource(R.string.edit_name), pr.name, { pr = pr.copy(name = it.take(16)) }, Modifier.fillMaxWidth())
             val maxW = LocalContext.current.graph.connection.backup.collectAsStateWithLifecycle().value?.conf?.wattMax
-            LabeledSlider(stringResource(R.string.edit_power), pr.powerFraction.toFloat(), { pr = pr.copy(powerFraction = it.toDouble()) },
+            LabeledSlider(stringResource(R.string.edit_power), pr.powerFraction.toFloat(), { pr = pr.copy(powerFraction = it.toDouble().coerceAtLeast(RideProfile.MIN_POWER_FRACTION)) }, RideProfile.MIN_POWER_FRACTION.toFloat()..1f,
                 display = { f -> maxW?.let { "%.0f PS · %.1f kW (%.0f%%)".format(it * f / 735.49875, it * f / 1000, f * 100) } ?: "%.0f%%".format(f * 100) })
             LabeledSlider(stringResource(R.string.edit_motor), pr.motorCurrentFraction.toFloat(), { pr = pr.copy(motorCurrentFraction = it.toDouble()) })
             LabeledSlider(stringResource(R.string.edit_batt), pr.batteryCurrentFraction.toFloat(), { pr = pr.copy(batteryCurrentFraction = it.toDouble()) })
@@ -128,7 +129,9 @@ private fun ProfileEditor(initial: RideProfile, onDone: (RideProfile?) -> Unit) 
             CurveEditor(pr.throttleCurve, Modifier.fillMaxWidth().height(180.dp)) { c -> pr = pr.copy(throttleCurve = c, character = if (pr.character.approximate) MotorCharacter.CUSTOM else pr.character) }
             SectionTitle(stringResource(R.string.edit_assist))
             Text(stringResource(R.string.edit_assist_hint), color = p.textDim, style = labelStyle(10))
-            LabeledSlider(stringResource(R.string.edit_flywheel), 0f, {}, enabled = false); LabeledSlider(stringResource(R.string.edit_traction), 0f, {}, enabled = false); LabeledSlider(stringResource(R.string.edit_wheelie), 0f, {}, enabled = false)
+            LabeledSlider(stringResource(R.string.edit_traction), pr.tractionControl.toFloat(), { pr = pr.copy(tractionControl = (Math.round(it * 20) / 20.0)) })
+            Text(stringResource(R.string.edit_traction_hint), color = p.textDim, style = labelStyle(10))
+            LabeledSlider(stringResource(R.string.edit_flywheel), 0f, {}, enabled = false); LabeledSlider(stringResource(R.string.edit_wheelie), 0f, {}, enabled = false)
             Toggle(stringResource(R.string.edit_temp_derate), pr.tempDerate, { pr = pr.copy(tempDerate = it) })
             Toggle(stringResource(R.string.edit_soc_derate), pr.socDerate, { pr = pr.copy(socDerate = it) })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {

@@ -1,5 +1,6 @@
 package org.kineticos.app
 
+import kotlin.math.roundToInt
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
@@ -76,6 +77,9 @@ class AppGraph(val ctx: Context) {
         motion.start()
         scope.launch { connection.events.collect { _toast.emit(it) } }
         warnings.start()
+        // version history (app + VESC firmware), like "app and bike version history" in other vehicle apps
+        VersionHistory.record(ctx, BuildConfig.VERSION_NAME, null, null)
+        scope.launch { connection.capabilities.collect { c -> c.firmware?.let { fw -> VersionHistory.record(ctx, BuildConfig.VERSION_NAME, fw.versionString, fw.hardwareName) } } }
         // keep drivetrain in sync with the active vehicle
         scope.launch { activeVehicle.collect { v -> v?.let { connection.drivetrain = Drivetrain(it.motorPolePairs, it.gearRatio, it.wheelDiameterM, it.batteryCellsSeries, it.batteryCapacityAh, it.batteryNominalV,
                 chemistry = runCatching { org.kineticos.telemetry.Chemistry.valueOf(it.batteryChemistry) }.getOrDefault(org.kineticos.telemetry.Chemistry.NMC)) } } }
@@ -213,7 +217,8 @@ class AppGraph(val ctx: Context) {
                     } else {
                         _appliedProfile.value = p.effective ?: target
                         settingsRepo.update { it.copy(activeProfileId = target.id) }
-                        "Applied " + p.summary + (if (p.warnings.isNotEmpty()) "\n" + p.warnings.joinToString("\n") else "")
+                        val tcNote = applyTractionLocked(c, (target.tractionControl * 100).roundToInt())
+                        "Applied " + p.summary + (tcNote?.let { "\n$it" } ?: "") + (if (p.warnings.isNotEmpty()) "\n" + p.warnings.joinToString("\n") else "")
                     }
                 }
             } catch (e: Exception) { _appliedProfile.value = null; "Write failed – vehicle mode unknown, treated as stock (${e.message})" }
@@ -240,6 +245,22 @@ class AppGraph(val ctx: Context) {
                     else -> "Vehicle state does not confirm the action – check lock state"
                 }
             } catch (e: Exception) { "No confirmation from vehicle (${e.message}) – check lock state before leaving" }
+        }
+    }
+
+    /** Traction control of the current mode, sent to the vehicle script after a mode change. Null = nothing to report. */
+    private suspend fun applyTractionLocked(c: org.kineticos.vesc.client.VescClient, percent: Int): String? {
+        val st = connection.scriptStatus.value
+        if (st?.tcPercent == null) return if (percent > 0) "Traction control not available – update kinetic.vescpkg" else null
+        if (st.tcPercent == percent) return null
+        return when (val d = gate.planTraction(percent, st, liveState())) {
+            is LockDecision.Denied -> "Traction control unchanged (${st.tcPercent} %): ${d.reason}"
+            is LockDecision.Allowed -> try {
+                val r = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token))?.takeIf { it.echoedCommand == 9 } ?: connection.refreshScript()
+                r?.let { connection.updateScript(it) }
+                when { r == null -> "Traction control: no confirmation"; r.echoedCommand == 9 && r.result != 0 -> "Traction control refused: ${r.resultText}"
+                    else -> "Traction control ${r.tcPercent ?: percent} %" }
+            } catch (e: Exception) { "Traction control: no confirmation (${e.message})" }
         }
     }
 

@@ -56,6 +56,14 @@ class SimulatedVescTransport(
     private var fails = 0; private var lockoutUntil = 0L; private var lockoutS = 60L
     var tamper = false; private set
     private var pushedSince = 0L
+    // emulated traction control (cmd 9): only ever reduces the applied scale
+    var tcPercent = 0; private set
+    private var tcScale = 1.0
+    /** Test hook: rear wheel spins (loss of grip) – TC intervenes if enabled. */
+    var wheelSpin = false
+    /** Test hook: vehicle is airborne – TC does not intervene. */
+    var airborne = false
+    val tcActive get() = tcScale < 0.999
     /** Test hook: someone pushes the parked vehicle (wheel turns while locked). */
     var externalErpm = 0.0
     private fun scriptReply(ver: Int, cmd: Int, res: Int): ByteArray {
@@ -66,6 +74,7 @@ class SimulatedVescTransport(
         w.u8((if (locked) 1 else 0) or (if (pin != null) 2 else 0) or (if (tamper) 4 else 0) or (if (lockedOut) 8 else 0))
         w.u8(if (lockedOut) ((lockoutUntil - clock()) / 1000).toInt().coerceIn(0, 255) else 0)
         w.u8((if (neutral) 1 else 0) or (if (parentalScale < 1.0 || parentalErpm > 0) 2 else 0)).i16((parentalScale * 1000).toInt())
+        w.u8(tcPercent).u8((if (tcActive) 1 else 0) or (if (airborne) 2 else 0))
         return w.toByteArray()
     }
     private fun applyMode(m: SMode) { maxScale = minOf(m.scale.coerceAtMost(ceilScale), parentalScale); wattMax = m.watt.coerceAtMost(ceilWatt); maxErpm = minOf(m.erpm, ceilErpm, if (parentalErpm > 0) parentalErpm else Double.MAX_VALUE) }
@@ -94,6 +103,8 @@ class SimulatedVescTransport(
             8 -> if (d.size < 13) 4 else { val p = r.u32(); val sc = r.u16() / 1000.0; val er = r.u32().toDouble()
                 when { pin == null -> 8; p != pin -> 7; moving && (sc > parentalScale || (er == 0.0 && parentalErpm > 0)) -> 3
                     else -> { parentalScale = sc.coerceIn(0.05, 1.0); parentalErpm = er; applyMode(sModes[scriptMode]); 0 } } }
+            9 -> if (d.size < 4) 4 else { val pct = r.u8()
+                when { pct > 100 -> 2; moving && pct < tcPercent -> 3; else -> { tcPercent = pct; 0 } } }
             6 -> if (d.size < 11) 4 else { val old = r.u32(); val new = r.u32()
                 when { locked -> 11; pin != null && old != pin -> 7; new !in 1000L..99_999_999L -> 10; else -> { pin = new; 0 } } }
             else -> 5
@@ -109,7 +120,10 @@ class SimulatedVescTransport(
         val now = clock(); val dt = ((now - lastStep).coerceIn(0, 1000)) / 1000.0; lastStep = now
         val time = (now - t0) / 1000.0
         throttle = if (locked || neutral) 0.0 else manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
-        val target = throttle * maxScale * maxErpm * 0.8
+        // traction control: on spin reduce towards the floor, otherwise recover; suspended while airborne
+        if (tcPercent > 0 && wheelSpin && !airborne) tcScale = maxOf(1 - 0.7 * tcPercent / 100.0, tcScale - 0.15 * tcPercent / 100.0)
+        else tcScale = minOf(1.0, tcScale + 0.5 * dt)
+        val target = throttle * maxScale * tcScale * maxErpm * 0.8
         erpm += (target - erpm) * min(1.0, dt * 0.8)
         if (locked) {
             erpm = if (externalErpm != 0.0) externalErpm else erpm * 0.5  // no drive torque; wheel only turns when pushed
@@ -123,7 +137,7 @@ class SimulatedVescTransport(
         tempMotor += (25 + abs(power) / 200 - tempMotor) * dt * 0.01
     }
     private fun voltage() = 84.0 - ah * 0.4
-    private fun motorCurrent() = (throttle * 120 * maxScale - erpm / 2000).coerceIn(-40.0, 150.0)
+    private fun motorCurrent() = (throttle * 120 * maxScale * tcScale - erpm / 2000).coerceIn(-40.0, 150.0)
     private fun inputCurrent() = (motorCurrent() * (erpm / maxErpm).coerceIn(0.0, 1.0)).coerceAtMost(wattMax / voltage())
 
     override suspend fun write(bytes: ByteArray) {

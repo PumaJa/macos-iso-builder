@@ -99,13 +99,15 @@ data class RideProfile(
     val throttleCurve: ThrottleCurve = ThrottleCurve.LINEAR,
     val engineBrakeFraction: Double = 0.0,     // requires LispBM throttle script – not applied by SET_MCCONF_TEMP
     val virtualFlywheel: Double = 0.0,         // requires hardware validation – disabled by SafetyGate
-    val tractionControl: Double = 0.0,         // requires wheel-speed sensor – disabled by SafetyGate
+    val tractionControl: Double = 0.0,         // 0..1 intervention, executed only by the vehicle script (cmd 9), can only reduce current
     val wheelieControl: Double = 0.0,          // requires IMU validation – disabled by SafetyGate
     val tempDerate: Boolean = true,
     val socDerate: Boolean = true,
 ) {
     companion object {
         const val MAX_PROFILES = 200
+        /** Modes below this power are refused (a near-zero mode feels like a fault and risks stalling on a hill). */
+        const val MIN_POWER_FRACTION = 0.05
         val ECO = RideProfile("eco", "ECO", true, powerFraction = 0.35, motorCurrentFraction = 0.5, batteryCurrentFraction = 0.4, regenFraction = 1.0, speedLimitKmh = 45.0)
         val SPORT = RideProfile("sport", "SPORT", true, powerFraction = 0.7, motorCurrentFraction = 0.8, batteryCurrentFraction = 0.75, regenFraction = 0.7)
         val RACE = RideProfile("race", "RACE", true, powerFraction = 1.0, motorCurrentFraction = 1.0, batteryCurrentFraction = 1.0, regenFraction = 0.4)

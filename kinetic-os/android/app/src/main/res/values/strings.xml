@@ -602,4 +602,10 @@
     <string name="set_tile_images_reset">Reset tile photos</string>
     <string name="set_text_scale">Text size</string>
     <string name="race_accuracy_note">At %1$.0f Hz a crossing is only known to ±%2$.2f s; interpolation improves this to about ±%3$.2f s (GPS accuracy %4$s). Estimate, not certified timing.</string>
+    <string name="edit_traction_hint">Runs on the vehicle (script): reduces motor current when the rear wheel spins up, off while airborne. Can only reduce power. Less intervention only at standstill.</string>
+    <string name="modes_row_tc"> · TC %1$d %%</string>
+    <string name="tc_pill">TC %1$d</string>
+    <string name="set_version_history">Version history (app · vehicle)</string>
+    <string name="home_charging">Charging</string>
+    <string name="home_charging_eta">full in %1$d:%2$02d h</string>
 </resources>

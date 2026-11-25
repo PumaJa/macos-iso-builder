@@ -602,4 +602,10 @@
     <string name="set_tile_images_reset">Återställ rutbilder</string>
     <string name="set_text_scale">Textstorlek</string>
     <string name="race_accuracy_note">Vid %1$.0f Hz är en passering bara känd till ±%2$.2f s; interpolering förbättrar till ca ±%3$.2f s (GPS-noggrannhet %4$s). Uppskattning, ingen certifierad tidtagning.</string>
+    <string name="edit_traction_hint">Körs på fordonet (skript): minskar motorströmmen när bakhjulet spinner, av i luften. Kan bara minska effekten. Mindre ingrepp bara vid stillastående.</string>
+    <string name="modes_row_tc"> · TC %1$d %%</string>
+    <string name="tc_pill">TC %1$d</string>
+    <string name="set_version_history">Versionshistorik (app · fordon)</string>
+    <string name="home_charging">Laddar</string>
+    <string name="home_charging_eta">full om %1$d:%2$02d h</string>
 </resources>

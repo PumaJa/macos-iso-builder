@@ -33,6 +33,16 @@
 (define lockout-base 60.0)         ; s, doubles per further failure series
 (define lockout-cap 3600.0)        ; s
 (define tamper-secs 1.0)           ; moving this long while locked sets TAMPER
+;; EXPERIMENTAL traction control (off by default, cmd 9; only ever REDUCES current).
+;; tc-max-erpm-rate is the ERPM/s rise rate considered "wheel spin" at 50% intervention.
+;; !! MUST BE TUNED PER VEHICLE (motor, gearing, wheel inertia) on a stand with the wheel
+;; !! off the ground. The default is a placeholder, NOT hardware-validated.
+(define tc-max-erpm-rate 20000.0)  ; ERPM/s; slip threshold = this * (2 - pct/100)
+(define tc-step    0.15)           ; scale decrease per tick on slip, times pct/100
+(define tc-depth   0.70)           ; floor = 1 - tc-depth * pct/100
+(define tc-recover 0.5)            ; scale recovery per second without slip
+(define air-acc-g  0.35)           ; |acc| below this (g) = free fall candidate
+(define air-secs   0.1)            ; ...for longer than this = airborne
 
 ;; ---------------------------------------------------------------- helpers
 (defun kmin (a b) (if (< a b) a b))
@@ -75,6 +85,11 @@
 (define ep-par-pm 1000)  ; mirrors of the EEPROM values
 (define ep-par-e 0)
 (define lock-reassert 0)
+(define tc-pct 0)        ; traction control intervention 0..100, RAM only (0 after boot)
+(define tc-scale 1.0)    ; TC current scale (0..1); only ever combined with min()
+(define tc-prev-erpm 0.0)
+(define tc-air-t 0.0)
+(define tc-air 0)
 (define ep-cnt 0)        ; mirrors of the EEPROM values (skip identical writes)
 (define ep-series 0)
 (defun lockout-dur (series) (kmin lockout-cap (* lockout-base (pow 2.0 (to-float (- series 1))))))
@@ -208,6 +223,7 @@
     (conf-set 'l-current-max-scale 0.0)
     (define applied-scale 0.0)
     (define eff-scale 0.0)
+    (define tc-scale 1.0)
   })
 
 (defun do-unlock ()
@@ -225,8 +241,11 @@
 (define applied-scale -1.0)
 (define req-ver 2)       ; version byte of the request being answered (replies echo it)
 
+(defun tc-flags3 ()
+  (+ (if (and (> tc-pct 0) (< tc-scale 0.999)) 1 0) (if (= tc-air 1) 2 0)))
+
 (defun send-status (cmd result)
-  (let ((b (bufcreate 22)))
+  (let ((b (bufcreate 24)))
     {
       (bufset-u8 b 0 proto-magic)
       (bufset-u8 b 1 req-ver)
@@ -244,6 +263,8 @@
       (bufset-u8 b 18 (lock-left-u8))
       (bufset-u8 b 19 (flags2))
       (bufset-u16 b 20 (rnd (* par-scale 1000.0)))
+      (bufset-u8 b 22 tc-pct)
+      (bufset-u8 b 23 (tc-flags3))
       (send-data b)
     }))
 
@@ -408,6 +429,23 @@
                               (send-status 8 0)
                             })))))))))
 
+;; cmd 9: [3] intervention percent 0..100 (0 = off). Raising always ok; lowering while
+;; moving: code 3. Accepted while locked (can only reduce power). RAM only.
+(defun handle-tc (d)
+  (if (< (buflen d) 4)
+      (reject 9 4)
+      (let ((p (bufget-u8 d 3)))
+        (if (> p 100)
+            (reject 9 2)
+            (if (and (< p tc-pct) (moving))
+                (reject 9 3)
+                {
+                  (define tc-pct p)
+                  (if (= p 0) { (define tc-scale 1.0) (define tc-air 0) (define tc-air-t 0.0) } nil)
+                  (define last-reject 0)
+                  (send-status 9 0)
+                })))))
+
 (defun proc-data (d)
   (if (and (>= (buflen d) 3)
            (= (bufget-u8 d 0) proto-magic)
@@ -424,6 +462,7 @@
           ((= cmd 6) (handle-set-pin d))
           ((= cmd 7) (handle-neutral d))
           ((= cmd 8) (handle-parental d))
+          ((= cmd 9) (handle-tc d))
             (t (reject cmd 5)))
         })
       nil))   ; wrong magic / version not 1 or 2: silently ignored (could be other app data)
@@ -470,8 +509,51 @@
     (if (= locked 1) (lock-tick) (derate-apply))
   })
 
+;; |acc| in g, or nil if there is no IMU (trap: a missing/failing IMU must never crash)
+(defun tc-acc ()
+  (let ((r (trap (get-imu-acc))))   ; trap returns (exit-ok value) or (exit-error ...)
+    (let ((a (if (and (eq (type-of r) 'type-list) (eq (first r) 'exit-ok)) (ix r 1) nil)))
+    (if (and (eq (type-of a) 'type-list) (>= (length a) 3) (eq (type-of (first a)) 'type-float))
+        (let ((x (ix a 0)) (y (ix a 1)) (z (ix a 2)))
+          (sqrt (+ (* x x) (+ (* y y) (* z z)))))
+        nil))))
+
+;; traction control: only ever lowers tc-scale's contribution; see derate-apply (min)
+(defun tc-update ()
+  {
+    (let ((rate (/ (- erpm tc-prev-erpm) loop-dt))
+          (rec (kmin 1.0 (+ tc-scale (* tc-recover loop-dt)))))
+      {
+        (define tc-prev-erpm erpm)
+        (if (= tc-pct 0)
+            {
+              (define tc-scale 1.0)
+              (define tc-air 0)
+              (define tc-air-t 0.0)
+            }
+            {
+              (let ((a (tc-acc)))
+                (if (and (not (eq a nil)) (< a air-acc-g))
+                    {
+                      (define tc-air-t (+ tc-air-t loop-dt))
+                      (define tc-air (if (> tc-air-t air-secs) 1 0))
+                    }
+                    {
+                      (define tc-air-t 0.0)
+                      (define tc-air 0)
+                    }))
+              (let ((pf (/ (to-float tc-pct) 100.0)))
+                (if (and (= tc-air 0) (> erpm 0.0) (> (get-current) 0.0)
+                         (> rate (* tc-max-erpm-rate (- 2.0 pf))))
+                    (define tc-scale (kmin tc-scale (kmax (- 1.0 (* tc-depth pf)) (- tc-scale (* tc-step pf)))))
+                    (define tc-scale rec)))
+            })
+      })
+  })
+
 (defun derate-apply ()
   {
+    (tc-update)
     (let ((df (derate-hi t-fet fet-start fet-end))
           (dm (if (= use-mot-temp 1) (derate-hi t-mot mot-start mot-end) 1.0))
           (dv (derate-lo vin v-start v-end)))
@@ -484,7 +566,8 @@
               (define eff-scale (kmin target (+ eff-scale step-up)))
               (define eff-scale (kmax target (- eff-scale step-down))))
           ;; never above boot ceiling: eff-scale is a fraction (<=1) of boot scale
-          (let ((s (* ceil-scale (clamp eff-scale 0.0 1.0))))
+          ;; TC can only lower the applied scale: min(eff-scale, tc-scale)
+          (let ((s (* ceil-scale (clamp (kmin eff-scale tc-scale) 0.0 1.0))))
             (if (> (abs (- s applied-scale)) 0.002)
                 {
                   (conf-set 'l-current-max-scale s)

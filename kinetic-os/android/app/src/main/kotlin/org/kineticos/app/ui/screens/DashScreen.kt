@@ -78,7 +78,7 @@ fun DashScreen(go: (Screen) -> Unit) {
             Pill(if (gpsFix != null) stringResource(R.string.dash_gps, gpsFix!!.accuracyM ?: 0.0) else stringResource(R.string.dash_no_gps), if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
             if (rec != null) Pill(stringResource(R.string.dash_rec), K.Danger)
             Spacer(Modifier.weight(1f))
-            if (landscape) { NeutralPill(); LockPill(); Spacer(Modifier.width(8.dp)) }
+            if (landscape) { TcPill(); NeutralPill(); LockPill(); Spacer(Modifier.width(8.dp)) }
             Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(26, FontWeight.Bold), color = p.text, maxLines = 1)
         }
         // second strip: riding time, neutral, lock (own row so nothing gets squeezed)
@@ -86,7 +86,7 @@ fun DashScreen(go: (Screen) -> Unit) {
             g.connection.engine?.movingTimeMs?.takeIf { status is ConnStatus.Online }?.let { ms ->
                 Pill("⏱ %d:%02d".format(ms / 3_600_000, ms / 60_000 % 60), p.text, Modifier.padding(end = 6.dp)) }
             Spacer(Modifier.weight(1f))
-            NeutralPill()
+            TcPill(); NeutralPill()
             LockPill()
         }
         if (status !is ConnStatus.Online) {

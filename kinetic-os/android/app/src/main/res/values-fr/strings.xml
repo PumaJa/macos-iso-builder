@@ -602,4 +602,10 @@
     <string name="set_tile_images_reset">Réinitialiser les photos des tuiles</string>
     <string name="set_text_scale">Taille du texte</string>
     <string name="race_accuracy_note">À %1$.0f Hz, un passage n’est connu qu’à ±%2$.2f s ; l’interpolation l’améliore à env. ±%3$.2f s (précision GPS %4$s). Estimation, chronométrage non certifié.</string>
+    <string name="edit_traction_hint">Fonctionne sur le véhicule (script) : réduit le courant moteur si la roue arrière patine, inactif en l’air. Ne peut que réduire la puissance. Moins d’intervention uniquement à l’arrêt.</string>
+    <string name="modes_row_tc"> · TC %1$d %%</string>
+    <string name="tc_pill">TC %1$d</string>
+    <string name="set_version_history">Historique des versions (app · véhicule)</string>
+    <string name="home_charging">En charge</string>
+    <string name="home_charging_eta">plein dans %1$d:%2$02d h</string>
 </resources>

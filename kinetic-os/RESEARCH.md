@@ -10,6 +10,10 @@ Raw notes with all source URLs: [docs/research_raw_stark.md](docs/research_raw_s
   third-party vehicles** found. A forum report says only the Stark phone connects to the VARG.
 * Third-party community efforts exist (Svag, VargPilot, `b1naryth1ef/svag-telemetry-format` – license unstated). They target
   reading Stark bikes, not letting non-Stark vehicles join Stark services. Not used.
+* **Stark app 2026 (checked 2026-11-25):** traction control via OTA for VARG Alpha, intervention 0–100 % per riding mode,
+  disengages when airborne; app/bike version history in settings; power maps blocked below a minimum power; map style kept
+  between rides. Sources: electrek.co (2026-06-28), powersportsbusiness.com (2026-06-30), Google Play listing "VARG"
+  (com.stark.moto, updated 2026-09-29). Kinetic implements the same *functions* for VESC (TC in the vehicle script), not the design.
 * **VargLink** (varglink.com, checked 2026-11-25): independent third-party Android app (`ru.varg.link`), not made by Stark.
   Group rides; guests without a Stark bike can join via an invite link (app or browser). No public API → Kinetic integrates
   only by opening invite links / the app (`GroupScreen.VargLinkCard`). No data exchange, no login, no reverse engineering.

@@ -62,11 +62,14 @@ class SafetyGate(
         else if (fw != null && backup.vescUuid != fw.uuidHex) reasons += "Backup belongs to a different controller"
         if (!live.linkHealthy) reasons += "Link unstable"
         if (live.faultCode != 0) reasons += "Controller reports fault ${live.faultCode}"
-        if (target.virtualFlywheel > 0 || target.tractionControl > 0 || target.wheelieControl > 0)
-            reasons += "Virtual flywheel / traction / wheelie control need hardware validation and are not enabled for riding"
+        if (target.virtualFlywheel > 0 || target.wheelieControl > 0)
+            reasons += "Virtual flywheel / wheelie control need hardware validation and are not enabled for riding"
+        if (target.tractionControl > 0)
+            reasons += "Traction control runs only in the vehicle script (kinetic.vescpkg) – direct mode writes cannot do it"
         listOf(target.powerFraction, target.motorCurrentFraction, target.batteryCurrentFraction, target.regenFraction).forEach {
             if (it.isNaN() || it !in 0.0..1.0) reasons += "Profile fraction $it outside 0..1"
         }
+        if (target.powerFraction < RideProfile.MIN_POWER_FRACTION) reasons += "Power below the minimum of ${(RideProfile.MIN_POWER_FRACTION * 100).toInt()} %"
         target.speedLimitKmh?.let { if (!it.isFinite() || it <= 0 || it > 400) reasons += "Speed limit $it km/h invalid" }
         target.reverseSpeedLimitKmh?.let { if (!it.isFinite() || it < 0 || it > 100) reasons += "Reverse limit $it km/h invalid" }
         backup?.conf?.let { c -> if (listOf(c.wattMax, c.inCurrentMax, c.maxErpm, c.currentMaxScale).any { !it.isFinite() }) reasons += "Backup contains invalid values" }
