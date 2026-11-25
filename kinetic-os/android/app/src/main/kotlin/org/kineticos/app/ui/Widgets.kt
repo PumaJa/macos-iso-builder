@@ -153,8 +153,9 @@ fun KineticLogo(modifier: Modifier = Modifier, size: Int = 22) {
 
 @Composable
 private fun LogoImage(path: String, modifier: Modifier) {
-    val bmp by produceState<ImageBitmap?>(null, path) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
+    var bmp by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
     }
     bmp?.let { Image(it, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
 }
@@ -167,8 +168,9 @@ private fun LogoImage(path: String, modifier: Modifier) {
 fun VehiclePhoto(path: String?, modifier: Modifier = Modifier) {
     if (path == null) return
     if (!path.startsWith("/")) { coil.compose.AsyncImage(path, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop); return }
-    val bmp by produceState<ImageBitmap?>(null, path) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    var bmp by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
                 val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 android.graphics.BitmapFactory.decodeFile(path, o)

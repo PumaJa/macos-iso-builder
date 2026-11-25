@@ -33,3 +33,5 @@
 25. **FR/IT/ES/SV translations** were machine-made and need review by native speakers; some long labels may be truncated.
 26. **Parental lock speed limit** needs correct wheel/gear data (VESC setup); without it only the power limit is available.
 27. **Power display in PS/kW** in ride modes is derived from the backed-up `l_watt_max` of the controller, not a dyno value.
+28. **Greyscale UI:** status is shown by brightness, labels and icons instead of colour (user wish). Simulation is still always marked with the SIM banner/tags. Map lines are grey/white and can be hard to see on light map styles.
+29. **Custom logo/background** images are stored only on the phone (app storage); they are not synced to the server or other phones.

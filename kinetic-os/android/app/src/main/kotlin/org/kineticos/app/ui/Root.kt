@@ -98,6 +98,8 @@ fun KineticRoot(activity: MainActivity) {
         val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
         val status by g.connection.status.collectAsStateWithLifecycle()
         val simulated = (status as? org.kineticos.app.core.ConnStatus.Online)?.simulated == true
+        val primary = listOf(Screen.HOME, Screen.DASH, Screen.MAP, Screen.MODES)
+        var more by remember { mutableStateOf(false) }
         Surface(color = p.bg, modifier = Modifier.fillMaxSize()) {
             // optional user background image, dimmed so the instruments stay readable
             settings.bgImage?.let { bg ->
@@ -108,29 +110,29 @@ fun KineticRoot(activity: MainActivity) {
                 if (simulated) SimBanner()
                 if (landscape) Row(Modifier.weight(1f)) {
                     NavigationRail(containerColor = p.bg.copy(alpha = if (settings.bgImage != null) 0.75f else 1f)) {
-                        Screen.entries.forEach { s -> NavigationRailItem(selected = s == screen, onClick = { screen = s; lastInteraction = System.currentTimeMillis() },
+                        primary.forEach { s -> NavigationRailItem(selected = s == screen, onClick = { screen = s; lastInteraction = System.currentTimeMillis() },
                             icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
                             colors = NavigationRailItemDefaults.colors(selectedIconColor = K.Accent, selectedTextColor = K.Accent, indicatorColor = Color.Transparent, unselectedIconColor = p.textDim, unselectedTextColor = p.textDim)) }
+                        NavigationRailItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, stringResource(R.string.nav_more)) }, label = { Text(stringResource(R.string.nav_more), style = labelStyle(9)) },
+                            colors = NavigationRailItemDefaults.colors(selectedIconColor = K.Accent, selectedTextColor = K.Accent, indicatorColor = Color.Transparent, unselectedIconColor = p.textDim, unselectedTextColor = p.textDim))
                     }
                     Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
                 } else {
                     Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
-                    val primary = listOf(Screen.HOME, Screen.DASH, Screen.MAP, Screen.MODES)
-                    var more by remember { mutableStateOf(false) }
                     NavigationBar(containerColor = p.bg.copy(alpha = if (settings.bgImage != null) 0.75f else 1f), tonalElevation = 0.dp) {
                         primary.forEach { s -> NavigationBarItem(selected = s == screen, onClick = { screen = s }, icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
                             colors = navColors()) }
                         NavigationBarItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, stringResource(R.string.nav_more)) }, label = { Text(stringResource(R.string.nav_more), style = labelStyle(9)) }, colors = navColors())
                     }
-                    if (more) AlertDialog(onDismissRequest = { more = false }, confirmButton = {}, containerColor = p.surface, title = { Text(stringResource(R.string.nav_menu)) }, text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Screen.entries.filter { it !in primary }.chunked(2).forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { s -> BigButton(stringResource(s.label), Modifier.weight(1f), selected = s == screen) { screen = s; more = false } } }
-                            }
-                        }
-                    })
                 }
             }
+            if (more) AlertDialog(onDismissRequest = { more = false }, confirmButton = {}, containerColor = p.surface, title = { Text(stringResource(R.string.nav_menu)) }, text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Screen.entries.filter { it !in primary }.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { s -> BigButton(stringResource(s.label), Modifier.weight(1f), selected = s == screen) { screen = s; more = false } } }
+                    }
+                }
+            })
             LockedOverlay()
             if (dimmed) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)))
         }

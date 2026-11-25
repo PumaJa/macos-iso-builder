@@ -143,6 +143,10 @@ erforderlich · **NS** = Nicht unterstützt.
 | Diebstahlsperre (Bike Lock) | siehe oben |
 | Bildschirmhelligkeit in der App | IH |
 | Sprachen DE/EN/FR/IT/ES/SV | IT (Lint) – FR/IT/ES/SV maschinell, Review nötig |
+| Eigenes Design-System: nur Schwarz → Weiß (Graustufen), Schrift Barlow Condensed (OFL), eigenes K-Logo | IT (Render) |
+| Querformat (Lenkerhalterung): 3-spaltiges Cockpit, geteilte Startseite; Ausrichtung Quer/Hoch/Auto | IT (Render quer + hoch) |
+| Personalisierung: Hintergrundbild + Abdunklung, eigenes Logo, eigener Name, Akzent-Helligkeit | IT (Render) / IH (Bildauswahl) |
+| Sperrbildschirm: animierter Sicherheitsring, Alarmbalken bei Bewegung, PIN-Feld direkt auf dem Bildschirm | IT (Render, Simulator-E2E) |
 | Firmware-Update über WLAN | bewusst nicht (Brick-Risiko) – VESC Tool verwenden |
 | Map-Switch-LED | nicht anwendbar (Stark-Hardware) |
 
@@ -155,4 +159,4 @@ erforderlich · **NS** = Nicht unterstützt.
 ## Was NICHT nachgebildet wird
 Originale Stark-Grafiken, Logos, Schriften, Fahrzeugdarstellung, Menütexte oder Quellcode (urheber-/markenrechtlich geschützt,
 keine APK bereitgestellt). Das UI ist eine eigenständige Gestaltung nach demselben Bedienkonzept (großes Tacho, Modus-Schnellwahl,
-dunkles Cockpit).
+dunkles Cockpit). Simulierte Daten werden graustufig, aber immer mit „SIM“-Banner und -Markierung angezeigt.

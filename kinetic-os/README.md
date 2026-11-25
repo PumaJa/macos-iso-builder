@@ -25,3 +25,4 @@ Start here: [docs/INSTALL.md](docs/INSTALL.md) · [FEATURE_MATRIX.md](FEATURE_MA
 * Nothing in this repository has been validated on a real vehicle yet. Read [docs/HARDWARE.md](docs/HARDWARE.md) before riding.
 
 License: GPL-3.0 (same as VESC firmware/VESC Tool from which protocol definitions were derived).
+Font: Barlow Condensed © The Barlow Project Authors, SIL Open Font License 1.1 (`docs/licenses/BarlowCondensed-OFL.txt`).

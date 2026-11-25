@@ -172,7 +172,7 @@ fun DashScreen(go: (Screen) -> Unit) {
                 BatteryBar(soc.value, soc.quality, Modifier.fillMaxWidth())
                 Text("${qTag(soc.quality)} · ${range?.let { stringResource(R.string.dash_range_est, it) } ?: stringResource(R.string.dash_range_na)}", style = labelStyle(10), color = p.textDim)
                 Spacer(Modifier.height(6.dp))
-                settings.dashTiles.take(4).chunked(2).forEach { row ->
+                settings.dashTiles.take(2).chunked(2).forEach { row ->
                     Row { row.forEach { key -> DashTile(key, s, engine, simulated, Modifier.weight(1f)) }; repeat(2 - row.size) { Spacer(Modifier.weight(1f)) } }
                 }
                 if ((s?.faultCode ?: 0) != 0) Pill(stringResource(R.string.dash_fault, (s?.faultName ?: s?.faultCode).toString()), K.Danger, Modifier.padding(4.dp))

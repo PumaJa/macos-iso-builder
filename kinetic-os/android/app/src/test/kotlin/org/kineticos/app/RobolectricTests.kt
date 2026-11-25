@@ -169,7 +169,7 @@ class UiSimulationTest {
         // locked: ride modes are refused by the vehicle, output stays disabled
         assertTrue(runBlocking { g.applyProfile(RideProfile.RACE) }.contains("locked"), "mode while locked")
         compose.setContent { KineticTheme(ThemeMode.NIGHT, true) { androidx.compose.foundation.layout.Box { DashScreen {}; LockedOverlay() } } }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("VEHICLE LOCKED").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("LOCKED").fetchSemanticsNodes().isNotEmpty() }
         // someone pushes the bike → tamper flag → warning
         sim.externalErpm = 2000.0
         waitFor(30_000) { g.connection.scriptStatus.value?.lock?.tamper == true }
