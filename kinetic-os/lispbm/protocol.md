@@ -1,19 +1,29 @@
-# Kinetic OS custom-app-data protocol v1
+# Kinetic OS custom-app-data protocol v2 (v1 still accepted)
 
-Transport: VESC `COMM_CUSTOM_APP_DATA` (phone -> VESC arrives in LispBM as `event-data-rx`; VESC -> phone via `send-data`). Payload = raw bytes below. All multi-byte integers are **big-endian** (LispBM `bufget/bufset` default). Packets with wrong magic/version are ignored silently (no reply).
+Transport: VESC `COMM_CUSTOM_APP_DATA` (phone -> VESC arrives in LispBM as `event-data-rx`; VESC -> phone via `send-data`). Payload = raw bytes below. All multi-byte integers are **big-endian** (LispBM `bufget/bufset` default). Versions 1 and 2 are accepted; any other magic/version is ignored silently (no reply). The only difference between them is the cmd 2 layout (v2 widens the watt field to u32). Every reply echoes the version of the request it answers; the reply layout is identical in both versions.
 
 ## Request (phone -> VESC)
 
 | Byte | Field | Notes |
 |---|---|---|
 | 0 | magic | 0x4B ('K') |
-| 1 | version | 1 |
+| 1 | version | 2 (current) or 1 (legacy cmd 2 layout) |
 | 2 | command | 1 set mode, 2 set custom params, 3 status request |
 
 ### cmd 1 - set mode (length 4)
 | 3 | mode index | 0 eco, 1 sport, 2 race, 3 custom1, 4 custom2 |
 
-### cmd 2 - set custom mode params (length 14)
+### cmd 2 - set custom mode params
+v2 (length 16, version byte 2):
+| Byte | Field | Type |
+|---|---|---|
+| 3 | slot | u8, 3 or 4 only |
+| 4-5 | current scale, permille (0..1000) | u16 |
+| 6-9 | max power, watts | u32 |
+| 10-11 | max battery current, 0.1 A | u16 |
+| 12-15 | max ERPM | u32 |
+
+v1 (length 14, version byte 1, legacy; watts limited to 65535):
 | Byte | Field | Type |
 |---|---|---|
 | 3 | slot | u8, 3 or 4 only |
@@ -22,7 +32,7 @@ Transport: VESC `COMM_CUSTOM_APP_DATA` (phone -> VESC arrives in LispBM as `even
 | 8-9 | max battery current, 0.1 A | u16 |
 | 10-13 | max ERPM | u32 |
 
-Values above the boot-time ceiling are silently clamped to the ceiling. Does not select the slot; send cmd 1 afterwards. If the slot is active and the vehicle is moving, an increase is rejected (code 3).
+The status reply carries no watt value, so it is the same in v1 and v2. A cmd 2 shorter than its version requires is rejected with code 4. Values above the boot-time ceiling are silently clamped to the ceiling. Does not select the slot; send cmd 1 afterwards. If the slot is active and the vehicle is moving, an increase is rejected (code 3).
 
 ### cmd 3 - status request (length 3)
 Reply only.
@@ -32,7 +42,7 @@ Reply only.
 | Byte | Field | Type / notes |
 |---|---|---|
 | 0 | magic | 0x4B |
-| 1 | version | 1 |
+| 1 | version | echoes request version (1 or 2) |
 | 2 | echoed command | u8 |
 | 3 | result code of this command | u8, 0 = OK, else reject code |
 | 4 | current mode | u8 0..4 |
@@ -57,4 +67,4 @@ Reply only.
 (Code 1 is unused/reserved.)
 
 ## Example
-Set race mode: `4B 01 01 02`. Status request: `4B 01 03`.
+Set race mode: `4B 02 01 02` (v1 form `4B 01 01 02` also works). Status request: `4B 02 03`. Set slot 3 to 120000 W (v2): `4B 02 02 03 01F4 0001D4C0 00FA 0000C350` (bytes concatenated; scale 500, 25.0 A, 50000 ERPM).

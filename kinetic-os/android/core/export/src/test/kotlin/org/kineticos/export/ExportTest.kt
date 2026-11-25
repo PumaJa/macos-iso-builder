@@ -258,3 +258,16 @@ class RideSummaryTest {
         assertTrue(noDead.elevationGainM > r.elevationGainM)
     }
 }
+
+class CsvInjectionTest {
+    @org.junit.Test fun formulaCellsNeutralisedButNegativeNumbersUntouched() {
+        kotlin.test.assertEquals("'=HYPERLINK(\"x\")", CsvExporter.text("=HYPERLINK(\"x\")"))
+        kotlin.test.assertEquals("'@SUM(A1)", CsvExporter.text("@SUM(A1)"))
+        kotlin.test.assertEquals("gps", CsvExporter.text("gps"))
+        val s = org.kineticos.telemetry.TelemetrySample(t = 1, simulated = false, faultName = "=cmd|' /C calc'!A0",
+            batteryCurrentA = org.kineticos.telemetry.Q(-12.5, org.kineticos.telemetry.Quality.MEASURED))
+        val csv = CsvExporter.toCsv(listOf(s))
+        kotlin.test.assertTrue(csv.contains("'=cmd"), csv)
+        kotlin.test.assertTrue(csv.contains(",-12.5,"), csv)
+    }
+}

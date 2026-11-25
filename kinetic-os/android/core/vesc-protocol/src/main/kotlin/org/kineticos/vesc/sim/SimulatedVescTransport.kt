@@ -30,12 +30,15 @@ class SimulatedVescTransport(
     private val t0 = clock()
 
     // toy state
-    var throttle = 0.0  // 0..1 driven by the simulator loop / tests
+    /** Manual throttle 0..1 for tests; null = automatic ride cycle (accelerate / cruise / brake). */
+    var manualThrottle: Double? = null
+    var throttle = 0.0; private set
     private var erpm = 0.0; private var ah = 0.0; private var wh = 0.0; private var whRegen = 0.0; private var tach = 0
     private var tempFet = 25.0; private var tempMotor = 25.0; private var lastStep = clock()
     private var maxScale = 1.0; private var wattMax = 15000.0; private var maxErpm = 50000.0
     val polePairs = 7; val gear = 8.0; val wheelD = 0.48
     val writesReceived = mutableListOf<Int>()
+    var odometerStartM = 1_234_000L
 
     override suspend fun connect() { _state.value = LinkState.Connecting; _state.value = LinkState.Connected("SIMULATED VESC") }
     override suspend fun disconnect() { _state.value = LinkState.Disconnected }
@@ -43,7 +46,7 @@ class SimulatedVescTransport(
     fun step() {
         val now = clock(); val dt = ((now - lastStep).coerceIn(0, 1000)) / 1000.0; lastStep = now
         val time = (now - t0) / 1000.0
-        if (throttle == 0.0) throttle = (0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8
+        throttle = manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
         val target = throttle * maxScale * maxErpm * 0.8
         erpm += (target - erpm) * min(1.0, dt * 0.8)
         val power = motorCurrent() * voltage()
@@ -81,6 +84,18 @@ class SimulatedVescTransport(
                     .f32(ah, 1e4).f32(0.0, 1e4).f32(wh, 1e4).f32(whRegen, 1e4).i32(tach).i32(abs(tach)).u8(0)
                     .f32(0.0, 1e6).u8(viaCan ?: 0).f16(tempFet, 1e1).f16(tempFet - 1, 1e1).f16(tempFet + 1, 1e1)
                     .f32(0.0, 1e3).f32(0.0, 1e3).u8(0)
+            }
+            CommPacketId.GET_DECODED_ADC -> {
+                w.u8(id).f32(throttle, 1e6).f32(0.8 + throttle * 2.5, 1e6).f32(0.0, 1e6).f32(0.0, 1e6)
+            }
+            CommPacketId.GET_VALUES_SETUP -> {
+                val speed = erpm / polePairs / gear / 60 * PI * wheelD
+                val dist = abs(tach) / (polePairs * 3.0 * 2) / gear * PI * wheelD
+                w.u8(id).f16(tempFet, 1e1).f16(tempMotor, 1e1).f32(motorCurrent(), 1e2).f32(inputCurrent(), 1e2)
+                    .f16(erpm / maxErpm, 1e3).f32(erpm, 1.0).f32(speed, 1e3).f16(voltage(), 1e1).f16(0.9, 1e3)
+                    .f32(ah, 1e4).f32(0.0, 1e4).f32(wh, 1e4).f32(whRegen, 1e4).f32(dist, 1e3).f32(dist, 1e3)
+                    .f32(0.0, 1e6).u8(0).u8(viaCan ?: 0).u8(canIds.size + 1).f32(1500.0 - wh, 1e3)
+                    .u32(odometerStartM + dist.toLong()).u32(clock() - t0)
             }
             CommPacketId.GET_MCCONF_TEMP -> {
                 w.u8(id).f32Auto(0.0).f32Auto(maxScale).f32Auto(-maxErpm).f32Auto(maxErpm).f32Auto(-0.95).f32Auto(0.95)

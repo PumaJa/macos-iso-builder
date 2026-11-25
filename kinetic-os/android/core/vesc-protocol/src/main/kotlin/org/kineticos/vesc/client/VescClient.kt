@@ -116,6 +116,8 @@ class VescClient(
     suspend fun stats(canId: Int? = null) = Parsers.stats(request(fwd(canId, Commands.getStats())))
     suspend fun batteryCut() = Parsers.batteryCut(request(Commands.getBatteryCut()))
     suspend fun gnss() = Parsers.gnss(request(Commands.getGnss()))
+    suspend fun decodedAdc(canId: Int? = null) = Parsers.decodedAdc(request(fwd(canId, Commands.getDecodedAdc()), retries = 0))
+    suspend fun decodedPpm(canId: Int? = null) = Parsers.decodedPpm(request(fwd(canId, Commands.getDecodedPpm()), retries = 0))
     /** PING_CAN scans the whole bus; firmware takes up to a few seconds. */
     suspend fun pingCan() = Parsers.pingCan(request(Commands.pingCan(), timeoutMs = 5000, retries = 0))
 

@@ -119,3 +119,11 @@ data class GnssData(
     val lat: Double?, val lon: Double?, val heightM: Double?, val speedMps: Double?, val hdop: Double?,
     val msToday: Int?,
 )
+
+/** COMM_GET_DECODED_ADC: decoded throttle (0..1, or -1..1 in centered modes) and raw ADC voltages of the ADC app. */
+@Serializable
+data class DecodedAdc(val level: Double, val voltageV: Double, val level2: Double, val voltage2V: Double)
+
+/** COMM_GET_DECODED_PPM: decoded PPM level (-1..1) and last pulse length (ms). */
+@Serializable
+data class DecodedPpm(val level: Double, val pulseLenMs: Double)

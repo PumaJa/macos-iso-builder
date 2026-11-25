@@ -40,7 +40,7 @@ fun LiveScreen() {
             Metric("Duty", s?.duty ?: Q.NA, "%", 0, 100.0); Metric("Throttle", s?.throttle ?: Q.NA, "%", 0, 100.0)
             Metric("Accel", s?.accelG ?: Q.NA, "g", 2); Metric("Lateral", s?.lateralG ?: Q.NA, "g", 2); Metric("Lean", s?.leanDeg ?: Q.NA, "°", 0); Metric("Pitch", s?.pitchDeg ?: Q.NA, "°", 0)
             Metric("Altitude", Q.of(s?.gps?.altM, Quality.MEASURED), "m"); Metric("GPS speed", Q.of(s?.gps?.speedMps, Quality.MEASURED), "km/h", 1, 3.6)
-            Metric("Trip", Q.of(e?.distanceM, cq), "km", 2, 0.001); Metric("Ride time", Q.of(e?.movingTimeMs?.div(60000.0), cq), "min", 1)
+            Metric("Trip", Q.of(e?.distanceM, cq), "km", 2, 0.001); Metric("Odometer", s?.odometerKm ?: Q.NA, "km", 1); Metric("Ride time", Q.of(e?.movingTimeMs?.div(60000.0), cq), "min", 1)
         }
         SectionTitle("Power & energy")
         FlowRow3 {
@@ -51,6 +51,7 @@ fun LiveScreen() {
             Metric("Consumption", Q.of(s?.let { e?.whPerKm(it) }, cq), "Wh/km", 0); Metric("Range", Q.of(s?.let { e?.rangeKm(it) }, if (sim) Quality.SIMULATED else Quality.ESTIMATED), "km")
             Metric("SoC", s?.socPct ?: Q.NA, "%")
         }
+        Text("Throttle = VESC ADC-app decoded level (only valid if the throttle is wired to the VESC ADC input).", color = p.textDim, style = labelStyle(10))
         Text("Efficiency (motor/battery) is not shown: VESC does not measure mechanical output, so a reliable value cannot be determined.", color = p.textDim, style = labelStyle(10))
         SectionTitle("Temperatures")
         FlowRow3 { Metric("MOSFET", s?.tempMosC ?: Q.NA, "°C", 1); Metric("Motor", s?.tempMotorC ?: Q.NA, "°C", 1) }
@@ -78,7 +79,7 @@ fun LiveScreen() {
             Text("HW ${caps.firmware?.hardwareName ?: "—"} · FW ${caps.firmware?.versionString ?: "—"} ${caps.firmware?.firmwareName ?: ""}", color = p.text)
             Text("UUID ${caps.firmware?.uuidHex ?: "—"}", color = p.textDim)
             Text("CAN devices: ${if (caps.canIds.isEmpty()) "none" else caps.canIds.joinToString { id -> "$id (${caps.canFirmware[id]?.hardwareName ?: "?"})" }}", color = p.text)
-            Text("Features: IMU ${yes(caps.imu)} · BMS ${yes(caps.bms)} · Stats ${yes(caps.stats)} · VESC GNSS ${yes(caps.gnss)} · Runtime limits ${yes(caps.mcConfTemp)}", color = p.text)
+            Text("Features: IMU ${yes(caps.imu)} · BMS ${yes(caps.bms)} · Stats ${yes(caps.stats)} · VESC GNSS ${yes(caps.gnss)} · Runtime limits ${yes(caps.mcConfTemp)} · ADC throttle ${yes(caps.adc)} · Odometer ${yes(caps.odometer)}", color = p.text)
             Text("Packets sent ${stats.sent} · received ${stats.received} · timeouts ${stats.timeouts} · CRC errors ${stats.crcErrors} · retries ${stats.retries}", color = p.textDim)
             Text("Fault: ${s?.faultName ?: "NONE"}", color = if ((s?.faultCode ?: 0) != 0) K.Danger else p.textDim)
         }

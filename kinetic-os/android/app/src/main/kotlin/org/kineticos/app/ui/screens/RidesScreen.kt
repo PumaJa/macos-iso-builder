@@ -159,9 +159,15 @@ object SrtOverlay {
     }
 }
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun VideoOverlay(uri: Uri, samples: List<TelemetrySample>, back: () -> Unit) {
     val p = LocalPalette.current
+    val ctx = LocalContext.current
+    val exporter = remember { org.kineticos.app.video.VideoOverlayExporter(ctx) }
+    val export by exporter.state.collectAsStateWithLifecycle()
+    val maxP = ctx.graph.activeVehicle.collectAsStateWithLifecycle().value?.maxPowerW ?: 10_000.0
+    DisposableEffect(Unit) { onDispose { if (exporter.state.value is org.kineticos.app.video.ExportState.Running) exporter.cancel() } }
     var posMs by remember { mutableLongStateOf(0L) }
     var offsetS by remember { mutableFloatStateOf(0f) }
     var vv by remember { mutableStateOf<VideoView?>(null) }
@@ -184,7 +190,18 @@ private fun VideoOverlay(uri: Uri, samples: List<TelemetrySample>, back: () -> U
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             BigButton("‹ BACK") { vv?.stopPlayback(); back() }
             BigButton("PLAY/PAUSE") { vv?.let { if (it.isPlaying) it.pause() else it.start() } }
-            Text("Preview overlay. For a burned-in video export the SRT file (Export → SRT) and render it in any video editor.", color = p.textDim, style = labelStyle(10))
+            when (val e = export) {
+                is org.kineticos.app.video.ExportState.Running -> BigButton("CANCEL ${e.percent}%", color = K.Warn) { exporter.cancel() }
+                is org.kineticos.app.video.ExportState.Done -> BigButton("SHARE MP4", color = K.Regen) {
+                    val u = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", e.file)
+                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share video").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                else -> BigButton("EXPORT MP4") { vv?.pause(); exporter.start(uri, samples, (offsetS * 1000).toLong(), maxP) }
+            }
+        }
+        (export as? org.kineticos.app.video.ExportState.Failed)?.let { Text("Export failed: ${it.message}", color = K.Danger, modifier = Modifier.padding(horizontal = 8.dp)) }
+        Row(Modifier.padding(horizontal = 8.dp)) {
+            Text("EXPORT MP4 burns the overlay into the video on the phone (uses the current sync offset). SRT export remains available for desktop editors.", color = p.textDim, style = labelStyle(10))
         }
     }
 }

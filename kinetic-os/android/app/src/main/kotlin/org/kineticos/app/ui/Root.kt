@@ -41,6 +41,7 @@ fun KineticRoot(activity: MainActivity) {
 
     LaunchedEffect(Unit) { g.toasts.collect { Toast.makeText(activity, it, Toast.LENGTH_SHORT).show() } }
     LaunchedEffect(Unit) { activity.deepLinkJoin.collect { screen = Screen.GROUP } }
+    LaunchedEffect(Unit) { activity.openScreen.collect { n -> Screen.entries.firstOrNull { it.name == n }?.let { screen = it } } }
     // Idle dimming (only while stationary): saves battery on a fixed cockpit phone
     var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {

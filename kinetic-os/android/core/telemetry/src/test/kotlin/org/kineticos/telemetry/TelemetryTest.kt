@@ -67,3 +67,15 @@ class TelemetryTest {
         val p = AdaptivePoller(start = 100); p.onTimeout(); assertEquals(200, p.intervalMs); repeat(10) { p.onTimeout() }; assertEquals(1000, p.intervalMs)
     }
 }
+
+class ThrottleOdometerTest {
+    @kotlin.test.Test fun throttleAndOdometerMeasuredWhenProvided() {
+        val dt = Drivetrain(7, 8.0, 0.5)
+        val v = org.kineticos.vesc.model.VescValues(40.0, 50.0, 10.0, 5.0, 0.0, 10.0, 0.2, 1000.0, 80.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, null, null, null, null, null, null, null, null)
+        val s = TelemetryEngine(dt, false).process(0, v, null, null, null, adc = org.kineticos.vesc.model.DecodedAdc(0.3, 1.5, 0.0, 0.0), odometerM = 12345)
+        kotlin.test.assertEquals(0.3, s.throttle.value); kotlin.test.assertEquals(Quality.MEASURED, s.throttle.quality)
+        kotlin.test.assertEquals(12.345, s.odometerKm.value!!, 1e-9)
+        val none = TelemetryEngine(dt, false).process(0, v, null, null, null)
+        kotlin.test.assertFalse(none.throttle.isAvailable); kotlin.test.assertFalse(none.odometerKm.isAvailable)
+    }
+}

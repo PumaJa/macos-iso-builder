@@ -15,6 +15,7 @@ import { bearerToken, verifyToken } from './logic/auth';
 import authRoutes from './routes/auth';
 import friendRoutes from './routes/friends';
 import groupRoutes from './routes/groups';
+import routeRoutes from './routes/route';
 import rideRoutes from './routes/rides';
 import telematicsRoutes from './routes/telematics';
 import vehicleRoutes from './routes/vehicles';
@@ -80,6 +81,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<{ app: Fasti
       await vehicleRoutes(api, ctx);
       await telematicsRoutes(api, ctx);
       await rideRoutes(api, ctx);
+      await routeRoutes(api, ctx);
     },
     { prefix: '/api/v1' },
   );

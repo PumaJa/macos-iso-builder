@@ -13,10 +13,13 @@
 
 ## Open
 - [ ] Hardware validation (docs/HARDWARE.md checklist) – needs a real VESC vehicle
+- [x] LispBM: validated in real LispBM interpreter (141 assertions), protocol v2 (u32 watts)
 - [ ] LispBM: run on real VESC, verify `conf-set` names on FW 6.06/7.00; add throttle-curve/engine-brake control (needs validation)
-- [ ] Push notifications for telematics alerts (FCM or UnifiedPush)
-- [ ] Road routing engine (BRouter/GraphHopper offline) for turn-by-turn
-- [ ] In-app MP4 rendering of video overlay (MediaCodec)
-- [ ] Keystore-encrypted token storage
-- [ ] Emulator run on a machine with KVM (this CI box has none)
+- [x] Telematics alert notifications (WebSocket live + WorkManager 15 min)
+- [x] Turn-by-turn via self-hosted OSRM (+ prepare script, compose profile)
+- [ ] Offline road routing on the phone (BRouter)
+- [x] In-app MP4 overlay export (Media3 Transformer)
+- [x] Keystore-encrypted token storage
+- [x] Throttle (GET_DECODED_ADC), VESC odometer, CSV formula-injection guard
+- [x] Emulator run (software emulation): app, simulator, map, MP4 export
 - [ ] Release signing key for distribution

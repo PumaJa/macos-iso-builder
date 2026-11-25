@@ -114,6 +114,60 @@ docker run --rm -v kinetic-os_api_data:/data -v "$PWD":/out alpine tar czf /out/
 
 Also copy `.env` (especially `JWT_SECRET`: changing it logs everyone out) somewhere safe.
 
+## Road routing (optional, OSRM)
+
+The server can proxy a self-hosted [OSRM](https://project-osrm.org/) instance so clients get turn-by-turn road
+routes without a third-party service. It is off by default (compose profile `routing`) and the OSRM container is
+never published on the host: only the authenticated API endpoint exposes it.
+
+```bash
+./osrm/prepare.sh europe/liechtenstein            # downloads the Geofabrik extract and builds the routing graph
+./osrm/prepare.sh europe/germany/bayern bicycle   # profile: car (default) | bicycle | foot
+docker compose --profile routing up -d            # starts osrm next to db/api
+```
+
+- `prepare.sh` needs docker and curl/wget, writes to `./osrm-data/` (git-ignored) and is idempotent: rerunning with the
+  same region/profile does nothing; a different region or profile rebuilds. `FORCE=1` rebuilds, `FORCE_DOWNLOAD=1`
+  refetches the extract, `OSM_PBF_URL=...` uses another mirror. Region names are Geofabrik paths
+  (<https://download.geofabrik.de/>). There is no motorcycle profile: use `car` (`motorcycle` is accepted as an alias).
+- One OSRM instance serves one region and one profile; the API always asks for `driving`.
+- Refresh the map by rerunning `FORCE_DOWNLOAD=1 ./osrm/prepare.sh <region>` and `docker compose restart osrm`.
+- `OSRM_URL` (default `http://osrm:5000`) is where the API looks for OSRM; set it empty to disable the endpoint
+  (it then answers 503 `routing_unavailable`). Without the profile running, the endpoint also answers 503.
+- Approximate needs (graph building is the peak; serving needs roughly the final data size in RAM):
+
+| Region | Download | Disk | RAM to prepare | RAM to serve |
+|---|---|---|---|---|
+| Liechtenstein / small city | < 5 MB | < 0.1 GB | < 0.5 GB | < 0.2 GB |
+| Large country (Germany) | ~4 GB | ~25 GB | ~16-24 GB | ~8-12 GB |
+| Europe | ~30 GB | ~200 GB | ~128 GB+ | ~64 GB |
+
+  The planet is not recommended on small hardware. Pick the smallest region that covers your rides.
+- **Attribution:** routing data derives from OpenStreetMap, (c) OpenStreetMap contributors, licensed under the
+  [ODbL](https://opendatacommons.org/licenses/odbl/). Clients that show a route or map must display
+  "(c) OpenStreetMap contributors".
+
+### `GET /api/v1/route`
+
+Requires `Authorization: Bearer <token>`. Rate limit: 60 requests/minute per client.
+
+| Query | Description |
+|---|---|
+| `coords` | required, `lon,lat;lon,lat[;...]`, 2-25 points, lon -180..180, lat -90..90, plain decimals |
+| `profile` | optional, only `driving` (default) |
+
+The API calls `OSRM_URL/route/v1/driving/{coords}?overview=full&geometries=geojson&steps=true` and returns the OSRM
+JSON unchanged (`code`, `routes[].distance` in metres, `routes[].duration` in seconds, `routes[].geometry` GeoJSON
+LineString `[lon,lat]`, `routes[].legs[].steps[]`, `waypoints`).
+
+| Status | Body |
+|---|---|
+| 200 | OSRM response |
+| 400 | `{"error":"validation_error"\|"bad_request","message":...}` for invalid coords/profile; or OSRM's own error body (`{"code":"NoRoute"\|"NoSegment"\|"InvalidQuery",...}`) |
+| 401 | `{"error":"unauthorized",...}` |
+| 429 | `{"error":"rate_limited",...}` |
+| 503 | `{"error":"routing_unavailable","message":...}` OSRM not configured, unreachable, timed out (10 s) or failing |
+
 ## Environment variables
 
 | Variable | Default | Description |
@@ -126,6 +180,7 @@ Also copy `.env` (especially `JWT_SECRET`: changing it logs everyone out) somewh
 | `DATA_DIR` | `/data` | Photos are stored in `$DATA_DIR/photos` |
 | `TRUST_PROXY` | `0` | `1` when behind a reverse proxy |
 | `DOMAIN`, `ACME_EMAIL` | - | Caddy (`https` profile) |
+| `OSRM_URL` | `http://osrm:5000` | OSRM base URL for `GET /api/v1/route`; empty disables it |
 | `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP` | `24`, `14` | Backup schedule / retention |
 
 Migrations in `migrations/*.sql` are applied automatically at start (tracked in `schema_migrations`).

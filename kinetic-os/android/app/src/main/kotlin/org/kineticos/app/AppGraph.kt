@@ -84,6 +84,7 @@ class AppGraph(val ctx: Context) {
         scope.launch { groupBroadcastLoop() }
         scope.launch { lapLoop() }
         socket.start()
+        scope.launch { alertsLoop() }
         // auto-connect to last transport
         scope.launch {
             val s = settingsRepo.current()
@@ -199,7 +200,7 @@ class AppGraph(val ctx: Context) {
             val online = connection.status.value is ConnStatus.Online
             val sample = connection.sample.value
             pending += TelematicsMapper.toState(if (online) sample else null, online && connection.linkHealthy.value,
-                sample?.tachAbs?.let { null }, connection.isSimulated, gps.fix.value)
+                sample?.odometerKm?.value, connection.isSimulated, gps.fix.value)
             if (pending.size > 500) pending.subList(0, pending.size - 500).clear()
             runCatching { api.pushStates(v.id, pending.toList()); pending.clear() }   // offline → kept and retried
         }
@@ -220,6 +221,20 @@ class AppGraph(val ctx: Context) {
                     if (share && s != null) put("telemetry", buildJsonObject { s.socPct.value?.let { put("socPct", it) }; s.batteryPowerW.value?.let { put("powerW", it) } })
                 })
             }
+        }
+    }
+
+    // ---------- telematics alerts as notifications ----------
+    private suspend fun alertsLoop() {
+        // keep WorkManager schedule in sync with the setting / login state
+        scope.launch { settings.map { it.alertNotifications && it.authToken != null }.distinctUntilChanged().collect { org.kineticos.app.alerts.AlertNotifier.schedule(ctx, it) } }
+        // subscribe all own vehicles for live alerts whenever the vehicle list changes
+        scope.launch { combine(vehicles, settings.map { it.authToken }.distinctUntilChanged()) { v, t -> if (t != null) v else emptyList() }.collect { list -> list.forEach { socket.subscribeVehicle(it.id) } } }
+        socket.messages.collect { o ->
+            if (o["type"]?.jsonPrimitive?.contentOrNull != "alert" || !settings.value.alertNotifications) return@collect
+            val vid = o["vehicleId"]?.jsonPrimitive?.contentOrNull ?: return@collect
+            val a = runCatching { AppJson.decodeFromJsonElement<Alert>(o["alert"]!!) }.getOrNull() ?: return@collect
+            org.kineticos.app.alerts.AlertNotifier.show(ctx, vehicles.value.firstOrNull { it.id == vid }?.name ?: "Vehicle", vid, a)
         }
     }
 

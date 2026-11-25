@@ -14,7 +14,7 @@ object CsvExporter {
         "amp_hours" to { s -> s.ampHours }, "amp_hours_charged" to { s -> s.ampHoursCharged },
         "watt_hours" to { s -> s.wattHours }, "watt_hours_charged" to { s -> s.wattHoursCharged },
         "temp_mos_c" to { s -> s.tempMosC }, "temp_motor_c" to { s -> s.tempMotorC },
-        "duty" to { s -> s.duty }, "throttle" to { s -> s.throttle },
+        "duty" to { s -> s.duty }, "throttle" to { s -> s.throttle }, "odometer_km" to { s -> s.odometerKm },
         "accel_g" to { s -> s.accelG }, "lateral_g" to { s -> s.lateralG },
         "lean_deg" to { s -> s.leanDeg }, "pitch_deg" to { s -> s.pitchDeg },
     )
@@ -29,6 +29,9 @@ object CsvExporter {
     fun num(v: Double?): String =
         if (v == null || v.isNaN() || v.isInfinite()) "" else BigDecimal.valueOf(v).let { if (it.signum() == 0) "0" else it.stripTrailingZeros().toPlainString() }
 
+    /** Neutralise spreadsheet formula injection (OWASP): text cells starting with = + - @ TAB CR get a leading quote. */
+    fun text(f: String): String = if (f.isNotEmpty() && f[0] in "=+-@\t\r") "'" + f else f
+
     fun escape(f: String): String =
         if (f.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) "\"" + f.replace("\"", "\"\"") + "\"" else f
 
@@ -36,12 +39,12 @@ object CsvExporter {
         writeRow(header, out)
         for (s in samples) {
             val row = ArrayList<String>(header.size)
-            row += s.t.toString(); row += s.simulated.toString(); row += s.speedSource
+            row += s.t.toString(); row += s.simulated.toString(); row += text(s.speedSource)
             for ((_, get) in qColumns) { val q = get(s); row += if (q.isAvailable) num(q.value) else ""; row += q.quality.name }
-            row += s.faultCode.toString(); row += s.faultName ?: ""; row += s.controllers.toString()
+            row += s.faultCode.toString(); row += text(s.faultName ?: ""); row += s.controllers.toString()
             val g = s.gps
             row += num(g?.lat); row += num(g?.lon); row += num(g?.altM); row += num(g?.speedMps)
-            row += num(g?.bearingDeg); row += num(g?.accuracyM); row += g?.timeMs?.toString() ?: ""; row += g?.provider ?: ""
+            row += num(g?.bearingDeg); row += num(g?.accuracyM); row += g?.timeMs?.toString() ?: ""; row += text(g?.provider ?: "")
             writeRow(row, out)
         }
     }

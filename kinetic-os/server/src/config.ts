@@ -9,6 +9,8 @@ const schema = z.object({
   TRUST_PROXY: z.enum(['0', '1', 'true', 'false']).default('0'),
   MIGRATIONS_DIR: z.string().optional(),
   PUBLIC_DIR: z.string().optional(),
+  // Base URL of an OSRM server; empty string disables GET /api/v1/route
+  OSRM_URL: z.string().default('http://osrm:5000'),
 });
 
 export interface Config {
@@ -20,6 +22,8 @@ export interface Config {
   trustProxy: boolean;
   migrationsDir?: string;
   publicDir?: string;
+  /** OSRM base URL; undefined/empty = routing not configured */
+  osrmUrl?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -38,5 +42,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: e.TRUST_PROXY === '1' || e.TRUST_PROXY === 'true',
     migrationsDir: e.MIGRATIONS_DIR,
     publicDir: e.PUBLIC_DIR,
+    osrmUrl: e.OSRM_URL.trim().replace(/\/+$/, '') || undefined,
   };
 }

@@ -27,6 +27,8 @@ enum class KeyAction { NEXT_SCREEN, PREV_SCREEN, MODE_UP, MODE_DOWN, LAP_MARK, W
 class MainActivity : ComponentActivity() {
     val keyActions = MutableSharedFlow<KeyAction>(extraBufferCapacity = 8)
     val deepLinkJoin = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
+    /** Screen requested by a notification (e.g. telematics alert → REMOTE). */
+    val openScreen = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
 
     private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startCockpit() }
 
@@ -76,6 +78,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleIntent(intent) }
     private fun handleIntent(i: Intent?) {
+        i?.getStringExtra("screen")?.let { openScreen.tryEmit(it) }
         i?.data?.takeIf { it.scheme == "kineticos" && it.host == "join" }?.lastPathSegment?.let { deepLinkJoin.tryEmit(it) }
     }
 

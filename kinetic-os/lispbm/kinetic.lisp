@@ -5,7 +5,7 @@
 
 ;; ---------------------------------------------------------------- tunables
 (define proto-magic 0x4B)          ; 'K'
-(define proto-ver   1)
+(define proto-ver   2)             ; current version; v1 requests still accepted
 (define stop-erpm   300.0)         ; |erpm| below this = "stationary" (mode up-shift allowed)
 (define loop-dt     0.1)           ; derate loop period, seconds (50..100 ms recommended)
 (define derate-floor 0.15)         ; derate never goes below this (VESC's own cutoffs still apply)
@@ -25,6 +25,8 @@
 (defun kmin (a b) (if (< a b) a b))
 (defun kmax (a b) (if (> a b) a b))
 (defun clamp (x lo hi) (kmax lo (kmin x hi)))
+;; round to nearest int (to-i truncates; f32 products like 0.57*1000 can land on 569.99997)
+(defun rnd (x) (if (< x 0.0) (to-i (- x 0.5)) (to-i (+ x 0.5))))
 (defun repl (l i v)
   (if (= i 0) (cons v (rest l))
       (cons (first l) (repl (rest l) (- i 1) v))))
@@ -89,22 +91,23 @@
 
 ;; ---------------------------------------------------------------- protocol
 (define applied-scale -1.0)
+(define req-ver 2)       ; version byte of the request being answered (replies echo it)
 
 (defun send-status (cmd result)
   (let ((b (bufcreate 17)))
     {
       (bufset-u8 b 0 proto-magic)
-      (bufset-u8 b 1 proto-ver)
+      (bufset-u8 b 1 req-ver)
       (bufset-u8 b 2 cmd)
       (bufset-u8 b 3 result)
       (bufset-u8 b 4 cur-mode)
-      (bufset-u16 b 5 (to-i (* eff-scale 1000.0)))
+      (bufset-u16 b 5 (rnd (* eff-scale 1000.0)))
       (bufset-u8 b 7 flags)
       (bufset-u8 b 8 last-reject)
-      (bufset-i8 b 9 (to-i t-fet))
-      (bufset-i8 b 10 (to-i t-mot))
-      (bufset-u16 b 11 (to-i (* vin 10.0)))
-      (bufset-i32 b 13 (to-i erpm))
+      (bufset-i8 b 9 (rnd t-fet))
+      (bufset-i8 b 10 (rnd t-mot))
+      (bufset-u16 b 11 (rnd (* vin 10.0)))
+      (bufset-i32 b 13 (rnd erpm))
       (send-data b)
     }))
 
@@ -126,9 +129,10 @@
           }
           (reject 1 3))))
 
-;; cmd 2 payload: [3]=idx(3|4) [4..5]=scale permille u16 [6..7]=watt u16 [8..9]=batt A*10 u16 [10..13]=erpm u32
+;; cmd 2 payload v1 (len 14): [3]=idx(3|4) [4..5]=scale permille u16 [6..7]=watt u16 [8..9]=batt A*10 u16 [10..13]=erpm u32
+;; cmd 2 payload v2 (len 16): [3]=idx [4..5]=scale permille u16 [6..9]=watt u32 [10..11]=batt A*10 u16 [12..15]=erpm u32
 (defun handle-set-custom (d)
-  (if (< (buflen d) 14)
+  (if (< (buflen d) (if (= req-ver 1) 14 16))
       (reject 2 4)
       (let ((idx (bufget-u8 d 3)))
         (if (or (< idx 3) (> idx 4))
@@ -137,9 +141,9 @@
                   ;; params may be edited anytime for non-active slot; if slot is
                   ;; active, new values must not be more powerful unless stationary
                   (let ((ns (clamp (/ (to-float (bufget-u16 d 4)) 1000.0) 0.0 1.0))
-                        (nw (kmin ceil-watt (to-float (bufget-u16 d 6))))
-                        (ni (kmin ceil-icur (/ (to-float (bufget-u16 d 8)) 10.0)))
-                        (ne (kmin ceil-erpm (to-float (bufget-u32 d 10)))))
+                        (nw (kmin ceil-watt (to-float (if (= req-ver 1) (bufget-u16 d 6) (bufget-u32 d 6)))))
+                        (ni (kmin ceil-icur (/ (to-float (bufget-u16 d (if (= req-ver 1) 8 10))) 10.0)))
+                        (ne (kmin ceil-erpm (to-float (bufget-u32 d (if (= req-ver 1) 10 12))))))
                     (if (and (= idx cur-mode) (>= (abs erpm) stop-erpm)
                              (or (> ns (mode-scale idx)) (> nw (mode-watt idx))
                                  (> ni (mode-icur idx)) (> ne (mode-erpm idx))))
@@ -158,14 +162,17 @@
 (defun proc-data (d)
   (if (and (>= (buflen d) 3)
            (= (bufget-u8 d 0) proto-magic)
-           (= (bufget-u8 d 1) proto-ver))
+           (or (= (bufget-u8 d 1) 1) (= (bufget-u8 d 1) 2)))
       (let ((cmd (bufget-u8 d 2)))
-        (cond
-          ((= cmd 1) (if (>= (buflen d) 4) (handle-set-mode (bufget-u8 d 3)) (reject 1 4)))
-          ((= cmd 2) (handle-set-custom d))
-          ((= cmd 3) (send-status 3 0))
-          (t (reject cmd 5))))
-      nil))   ; wrong magic/version: silently ignored (could be other app data)
+        {
+          (define req-ver (bufget-u8 d 1))
+          (cond
+            ((= cmd 1) (if (>= (buflen d) 4) (handle-set-mode (bufget-u8 d 3)) (reject 1 4)))
+            ((= cmd 2) (handle-set-custom d))
+            ((= cmd 3) (send-status 3 0))
+            (t (reject cmd 5)))
+        })
+      nil))   ; wrong magic / version not 1 or 2: silently ignored (could be other app data)
 
 (defun event-handler ()
   (loopwhile t
@@ -204,6 +211,7 @@
 ;; ---------------------------------------------------------------- start
 (define eff-scale (mode-scale 0))      ; start in eco, at its scale
 (apply-static)
+;;;@@ AUTOSTART-BEGIN (test/run_tests.sh strips everything from this line to EOF; keep it last)
 (event-register-handler (spawn event-handler))
 (event-enable 'event-data-rx)
 

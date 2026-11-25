@@ -92,7 +92,7 @@ class Api(private val baseUrl: () -> String, private val token: () -> String?) {
         call("POST", "/telematics/$vehicleId/state", buildJsonObject { put("states", AppJson.encodeToJsonElement(states)) })
     }
     suspend fun remoteState(vehicleId: String): RemoteState = call("GET", "/telematics/$vehicleId/state").to()
-    suspend fun alerts(vehicleId: String): List<Alert> = call("GET", "/telematics/$vehicleId/alerts").to()
+    suspend fun alerts(vehicleId: String, since: Long? = null): List<Alert> = call("GET", "/telematics/$vehicleId/alerts" + (since?.takeIf { it > 0 }?.let { "?since=$it" } ?: "")).to()
     suspend fun geofences(vehicleId: String): List<Geofence> = call("GET", "/telematics/$vehicleId/geofences").to()
     suspend fun addGeofence(vehicleId: String, name: String, lat: Double, lon: Double, r: Double, on: String) {
         call("POST", "/telematics/$vehicleId/geofences", obj("name" to name, "lat" to lat, "lon" to lon, "radiusM" to r, "alertOn" to on))
@@ -101,6 +101,13 @@ class Api(private val baseUrl: () -> String, private val token: () -> String?) {
     suspend fun telematicsSettings(vehicleId: String, lowBatteryPct: Int, maintenanceKm: Int, moveAlert: Boolean) {
         call("PUT", "/telematics/$vehicleId/settings", obj("lowBatteryPct" to lowBatteryPct, "maintenanceKm" to maintenanceKm, "moveAlert" to moveAlert))
     }
+    /** Road route via the server's self-hosted OSRM (GET /route). Points as (lat, lon). */
+    suspend fun route(points: List<Pair<Double, Double>>): JsonObject {
+        require(points.size in 2..25) { "2–25 points" }
+        val coords = points.joinToString(";") { (lat, lon) -> "%.6f,%.6f".format(java.util.Locale.ROOT, lon, lat) }
+        return call("GET", "/route?coords=" + java.net.URLEncoder.encode(coords, "UTF-8") + "&profile=driving")!!.jsonObject
+    }
+
     suspend fun uploadRide(body: JsonObject) { call("POST", "/rides", body) }
     suspend fun leaderboard(trackId: String): JsonArray = call("GET", "/tracks/$trackId/leaderboard")?.jsonArray ?: JsonArray(emptyList())
     suspend fun postLap(trackId: String, lapMs: Long, sectors: List<Long>, vehicleId: String, gpsHz: Double) {

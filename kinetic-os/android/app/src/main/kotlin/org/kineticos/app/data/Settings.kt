@@ -36,6 +36,7 @@ data class AppSettings(
     val mapStyleDay: String = "https://tiles.openfreemap.org/styles/liberty",
     val mapStyleNight: String = "https://tiles.openfreemap.org/styles/dark",
     val powerSaver: Boolean = false,
+    val alertNotifications: Boolean = true,
 )
 
 class SettingsRepo(private val ctx: Context) {
@@ -48,7 +49,7 @@ class SettingsRepo(private val ctx: Context) {
         val glove = booleanPreferencesKey("glove"); val poll = intPreferencesKey("pollHz"); val server = stringPreferencesKey("server")
         val token = stringPreferencesKey("token"); val user = stringPreferencesKey("user"); val tele = booleanPreferencesKey("telematics")
         val share = booleanPreferencesKey("share"); val styleDay = stringPreferencesKey("styleDay"); val styleNight = stringPreferencesKey("styleNight")
-        val saver = booleanPreferencesKey("saver")
+        val saver = booleanPreferencesKey("saver"); val alerts = booleanPreferencesKey("alerts")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -58,9 +59,9 @@ class SettingsRepo(private val ctx: Context) {
             p[K.kiosk] ?: d.kiosk, p[K.theme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: d.theme,
             p[K.speed]?.let { runCatching { SpeedUnit.valueOf(it) }.getOrNull() } ?: d.speedUnit,
             p[K.power]?.let { runCatching { PowerUnit.valueOf(it) }.getOrNull() } ?: d.powerUnit,
-            p[K.glove] ?: d.gloveMode, p[K.poll] ?: d.pollHz, p[K.server] ?: d.serverUrl, p[K.token], p[K.user],
+            p[K.glove] ?: d.gloveMode, p[K.poll] ?: d.pollHz, p[K.server] ?: d.serverUrl, p[K.token]?.let { TokenCipher.decrypt(it) }, p[K.user],
             p[K.tele] ?: d.telematicsEnabled, p[K.share] ?: d.shareTelemetryInGroups,
-            p[K.styleDay] ?: d.mapStyleDay, p[K.styleNight] ?: d.mapStyleNight, p[K.saver] ?: d.powerSaver,
+            p[K.styleDay] ?: d.mapStyleDay, p[K.styleNight] ?: d.mapStyleNight, p[K.saver] ?: d.powerSaver, p[K.alerts] ?: d.alertNotifications,
         )
     }
     suspend fun current() = flow.first()
@@ -71,9 +72,9 @@ class SettingsRepo(private val ctx: Context) {
             put(K.vehicle, n.activeVehicleId); put(K.profile, n.activeProfileId); put(K.autoConnect, n.autoConnect); put(K.lastTransport, n.lastTransport)
             put(K.boot, n.autoStartOnBoot); put(K.autoRecord, n.autoRecord); put(K.screenOn, n.keepScreenOn); put(K.dim, n.dimAfterIdleS)
             put(K.kiosk, n.kiosk); put(K.theme, n.theme.name); put(K.speed, n.speedUnit.name); put(K.power, n.powerUnit.name)
-            put(K.glove, n.gloveMode); put(K.poll, n.pollHz.coerceIn(1, 50)); put(K.server, n.serverUrl.trim().trimEnd('/')); put(K.token, n.authToken)
+            put(K.glove, n.gloveMode); put(K.poll, n.pollHz.coerceIn(1, 50)); put(K.server, n.serverUrl.trim().trimEnd('/')); put(K.token, n.authToken?.let { TokenCipher.encrypt(it) })
             put(K.user, n.username); put(K.tele, n.telematicsEnabled); put(K.share, n.shareTelemetryInGroups)
-            put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver)
+            put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver); put(K.alerts, n.alertNotifications)
         }
     }
 }

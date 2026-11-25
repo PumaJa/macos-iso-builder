@@ -63,6 +63,13 @@ Only members can read a private group. Codes are random, unique, case-insensitiv
 | GET | /rides?vehicleId | – | `[ride]` |
 | GET | /rides/:id | – | ride incl. gpx |
 
+## Road routing (optional, self-hosted OSRM – compose profile `routing`)
+`GET /route?coords=lon,lat;lon,lat[;…]&profile=driving` (auth, 60 req/min)
+* `coords`: 2–25 points, plain decimals, lon −180..180, lat −90..90. `profile`: only `driving` (motorcycle ≈ car profile).
+* 200: unchanged OSRM `/route/v1` JSON (`routes[0].distance` m, `.duration` s, GeoJSON geometry `[lon,lat]`, `legs[].steps[].maneuver{type,modifier,location,exit}`, `waypoints[].distance` = snap distance).
+* 400 `validation_error`/`bad_request` or OSRM 4xx passthrough (`NoRoute`, `NoSegment`, `InvalidQuery`); 503 `routing_unavailable` when `OSRM_URL` is empty/unreachable.
+* Setup: `server/osrm/prepare.sh europe/germany/bayern car` then `docker compose --profile routing up -d`.
+
 ## Laps / leaderboards
 | POST | /tracks | `{name, startLine:{lat1,lon1,lat2,lon2}, sectors:[...]}` | `201 track` |
 | GET | /tracks | – | `[track]` |

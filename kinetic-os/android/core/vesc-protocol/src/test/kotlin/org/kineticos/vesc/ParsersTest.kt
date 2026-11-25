@@ -60,3 +60,25 @@ class ParsersTest {
         assertFailsWith<IllegalArgumentException> { Commands.forwardCan(255, Commands.getValues()) }
     }
 }
+
+class AdcAndSetupTest {
+    @kotlin.test.Test fun decodedAdcLayout() {
+        val w = org.kineticos.vesc.codec.VescWriter().i32(523_000).i32(1_850_000).i32(0).i32(-1)
+        val a = org.kineticos.vesc.codec.Parsers.decodedAdc(w.toByteArray())
+        kotlin.test.assertEquals(0.523, a.level, 1e-9); kotlin.test.assertEquals(1.85, a.voltageV, 1e-9)
+        kotlin.test.assertContentEquals(byteArrayOf(32), org.kineticos.vesc.codec.Commands.getDecodedAdc())
+        kotlin.test.assertContentEquals(byteArrayOf(31), org.kineticos.vesc.codec.Commands.getDecodedPpm())
+    }
+
+    @kotlin.test.Test fun simulatorServesOdometerAndThrottle() = kotlinx.coroutines.runBlocking<Unit> {
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val sim = org.kineticos.vesc.sim.SimulatedVescTransport().apply { manualThrottle = 0.4 }
+        sim.connect()
+        val c = org.kineticos.vesc.client.VescClient(sim, scope, 300); c.start(); kotlinx.coroutines.delay(50)
+        kotlin.test.assertEquals(0.4, c.decodedAdc().level, 1e-6)
+        val st = c.setupValues()
+        kotlin.test.assertTrue(st.odometerM!! >= 1_234_000L); kotlin.test.assertEquals(2, st.numVescs)
+        scope.cancel()
+    }
+}
+private fun kotlinx.coroutines.CoroutineScope.cancel() = (this.coroutineContext[kotlinx.coroutines.Job])?.cancel()

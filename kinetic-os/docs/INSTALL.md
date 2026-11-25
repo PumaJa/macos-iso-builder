@@ -52,3 +52,15 @@ docker compose --profile https up -d    # with Caddy + Let's Encrypt (set DOMAIN
 ```
 App: Settings → Account → server URL (`https://ride.example.com`), register/login. Then Group, Remote and telematics work.
 Backups: nightly `pg_dump` into `server/backups/` (restore instructions in server/README.md).
+
+### Optional: turn-by-turn road routing (self-hosted OSRM)
+```bash
+cd server && ./osrm/prepare.sh europe/germany/bayern car    # Geofabrik region, profile car|bicycle|foot (motorcycle = car)
+docker compose --profile routing up -d
+```
+In the app: Map → NAVIGATE TO… → tap the destination. Re-routes automatically when you leave the route.
+RAM/disk: roughly 2–3× the .pbf size during preparation (see server/README.md).
+
+### Alert notifications on a second phone
+Install Kinetic OS on the second phone, log in with the same account, Remote → enable *Alert notifications*. Alerts arrive
+instantly while the app runs and are checked every 15 min in the background.

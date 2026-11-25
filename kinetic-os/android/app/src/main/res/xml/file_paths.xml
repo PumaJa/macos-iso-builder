@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths><cache-path name="exports" path="exports/" /><files-path name="photos" path="photos/" /></paths>
+<paths><cache-path name="exports" path="exports/" /><files-path name="photos" path="photos/" /><external-files-path name="videos" path="." /><files-path name="videos_int" path="." /></paths>

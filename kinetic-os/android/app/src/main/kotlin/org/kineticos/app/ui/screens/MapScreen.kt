@@ -46,7 +46,7 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import java.util.UUID
 
-enum class MapTool { NONE, WAYPOINT, MEASURE, PLAN }
+enum class MapTool { NONE, WAYPOINT, MEASURE, PLAN, NAVIGATE }
 
 @Composable
 fun MapScreen() {
@@ -67,6 +67,23 @@ fun MapScreen() {
     val guide = remember(activeRoute) { activeRoute?.let { RouteGuide(it) } }
     val guidance = remember(fix, guide) { fix?.let { f -> guide?.update(f.lat, f.lon) } }
     var info by remember { mutableStateOf<String?>(null) }
+    var turn by remember { mutableStateOf<org.kineticos.app.nav.TurnByTurn?>(null) }
+    var destination by remember { mutableStateOf<RoutePoint?>(null) }
+    var lastReroute by remember { mutableLongStateOf(0L) }
+    val turnGuidance = remember(fix, turn) { fix?.let { f -> turn?.update(f.lat, f.lon) } }
+    suspend fun requestRoute(to: RoutePoint) {
+        val f = fix ?: run { g.toast("No GPS fix"); return }
+        runCatching { org.kineticos.app.nav.OsrmParser.parse(g.api.route(listOf(f.lat to f.lon, to.lat to to.lon))) }
+            .onSuccess { r -> turn = org.kineticos.app.nav.TurnByTurn(r); activeRoute = r.points; destination = to
+                info = "%.1f km · %.0f min".format(r.distanceM / 1000, r.durationS / 60) + r.warnings.joinToString("") { "\n⚠ $it" } }
+            .onFailure { e -> g.toast(when (e) { is org.kineticos.app.net.ApiException -> if (e.code == 503) "Road routing not set up on the server (see server/README → routing)" else e.message ?: "routing failed"; else -> e.message ?: "routing failed" }) }
+    }
+    // automatic re-routing when off route (at most every 20 s)
+    LaunchedEffect(turnGuidance?.offRoute) {
+        val d = destination
+        if (turnGuidance?.offRoute == true && d != null && System.currentTimeMillis() - lastReroute > 20_000) { lastReroute = System.currentTimeMillis(); requestRoute(d) }
+        if (turnGuidance?.arrived == true) { g.toast("Destination reached"); turn = null; destination = null }
+    }
     val night = p.night
     val trail = remember { mutableStateListOf<RoutePoint>() }
     LaunchedEffect(fix) { fix?.let { trail += RoutePoint(it.lat, it.lon); if (trail.size > 3000) trail.removeAt(0) } }
@@ -116,6 +133,7 @@ fun MapScreen() {
                 when (tool) {
                     MapTool.WAYPOINT -> { scope.launch { g.db.nav().addWaypoint(WaypointEntity(name = "WP ${waypoints.size + 1}", lat = ll.latitude, lon = ll.longitude, ele = null)) }; true }
                     MapTool.MEASURE, MapTool.PLAN -> { plan += RoutePoint(ll.latitude, ll.longitude); info = "%.2f km".format(RouteGuide.polylineLengthM(plan) / 1000); true }
+                    MapTool.NAVIGATE -> { tool = MapTool.NONE; scope.launch { requestRoute(RoutePoint(ll.latitude, ll.longitude)) }; true }
                     MapTool.NONE -> { follow = false; false }
                 }
             }
@@ -144,7 +162,15 @@ fun MapScreen() {
     Box(Modifier.fillMaxSize()) {
         AndroidView({ mapView }, Modifier.fillMaxSize())
         Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
-            guidance?.let { gd ->
+            turnGuidance?.let { tg ->
+                Card {
+                    Text(if (tg.offRoute) "OFF ROUTE – recalculating" else "%s  ·  %s".format(if (tg.distanceToTurnM < 1000) "%.0f m".format(tg.distanceToTurnM) else "%.1f km".format(tg.distanceToTurnM / 1000), tg.next.instruction),
+                        style = labelStyle(16), color = if (tg.offRoute) K.Danger else K.Accent)
+                    tg.then?.let { Text("then: ${it.instruction}", style = labelStyle(11), color = p.textDim) }
+                    Text("Remaining %.1f km".format(tg.remainingM / 1000), style = labelStyle(11), color = p.textDim)
+                }
+            }
+            if (turnGuidance == null) guidance?.let { gd ->
                 Card {
                     Text(if (gd.offRoute) "OFF ROUTE  %.0f m".format(gd.distanceToRouteM) else "NEXT %.0f m · %03.0f°".format(gd.distanceToNextM, gd.bearingToNextDeg), style = labelStyle(14), color = if (gd.offRoute) K.Danger else K.Accent)
                     Text("Remaining %.1f km · %.0f%%".format(gd.remainingM / 1000, gd.progressFrac * 100), style = labelStyle(11), color = p.textDim)
@@ -158,6 +184,10 @@ fun MapScreen() {
         Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(p.bg.copy(alpha = 0.7f)).horizontalScroll(rememberScrollState()).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             BigButton(if (follow) "FOLLOW ✓" else "FOLLOW", selected = follow) { follow = !follow }
             BigButton(if (headingUp) "HEADING UP" else "NORTH UP", selected = headingUp) { headingUp = !headingUp }
+            BigButton(if (turn != null) "STOP NAV" else "NAVIGATE TO…", selected = tool == MapTool.NAVIGATE || turn != null) {
+                if (turn != null) { turn = null; destination = null; activeRoute = null; info = null }
+                else { tool = MapTool.NAVIGATE; g.toast("Tap the destination on the map") }
+            }
             BigButton("GPX IMPORT") { gpxPicker.launch("*/*") }
             BigButton("WAYPOINT", selected = tool == MapTool.WAYPOINT) { tool = if (tool == MapTool.WAYPOINT) MapTool.NONE else MapTool.WAYPOINT }
             BigButton("MEASURE", selected = tool == MapTool.MEASURE) { if (tool == MapTool.MEASURE) { tool = MapTool.NONE; plan.clear(); info = null } else { plan.clear(); tool = MapTool.MEASURE } }
@@ -168,7 +198,7 @@ fun MapScreen() {
                     g.toast("Route saved") } }; plan.clear(); info = null }
                 else { plan.clear(); tool = MapTool.PLAN }
             }
-            if (activeRoute != null) BigButton("END ROUTE", color = K.Danger) { activeRoute = null }
+            if (activeRoute != null && turn == null) BigButton("END ROUTE", color = K.Danger) { activeRoute = null }
             routes.take(5).forEach { r -> BigButton(r.name.take(14)) {
                 runCatching { GpxImporter.parse(r.gpx) }.getOrNull()?.let { gd -> activeRoute = (gd.tracks.flatten() + gd.routes.flatten()).map { RoutePoint(it.lat, it.lon, it.ele) } }
             } }

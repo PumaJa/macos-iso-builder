@@ -47,6 +47,7 @@ data class TelemetrySample(
     val tempMotorC: Q = Q.NA,
     val duty: Q = Q.NA,
     val throttle: Q = Q.NA,
+    val odometerKm: Q = Q.NA,    // VESC persistent odometer (GET_VALUES_SETUP), survives power cycles
     val faultCode: Int = 0,
     val faultName: String? = null,
     val tachAbs: Long? = null,

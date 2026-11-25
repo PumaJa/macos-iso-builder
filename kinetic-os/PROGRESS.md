@@ -14,3 +14,8 @@
 | 2026-11-24 | App tests (Robolectric, MockWebServer) | see TEST_RESULTS.md |
 | 2026-11-24 | Docker stack + E2E smoke + Chromium dashboard | all green |
 | 2026-11-24 | Emulator (TCG) | app runs; FGS start crash found & fixed; map blocked by sandbox TLS proxy |
+| 2026-11-25 | LispBM in real interpreter (subagent) | 141 assertions + 5 smoke checks; rounding bug fixed; protocol v2 (u32 watts) |
+| 2026-11-25 | OSRM routing (subagent) | /api/v1/route + compose profile; e2e Zurich route 7.1 km / 17 steps |
+| 2026-11-25 | Throttle (ADC), odometer, Keystore token, CSV injection guard | tests green |
+| 2026-11-25 | Alert notifications (WS + WorkManager) | Robolectric test green |
+| 2026-11-25 | Turn-by-turn client, MP4 overlay export (Media3) | unit tests green; export instrumented on emulator |

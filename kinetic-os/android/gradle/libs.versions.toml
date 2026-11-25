@@ -16,6 +16,7 @@ coreKtx = "1.15.0"
 datastore = "1.1.1"
 coil = "2.7.0"
 junit = "4.13.2"
+media3 = "1.5.1"
 
 [libraries]
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -48,6 +49,9 @@ core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 coil = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 junit = { module = "junit:junit", version.ref = "junit" }
+media3-transformer = { module = "androidx.media3:media3-transformer", version.ref = "media3" }
+media3-effect = { module = "androidx.media3:media3-effect", version.ref = "media3" }
+media3-common = { module = "androidx.media3:media3-common", version.ref = "media3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

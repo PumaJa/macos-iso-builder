@@ -17,6 +17,8 @@ object Commands {
     fun getBatteryCut() = cmd(CommPacketId.GET_BATTERY_CUT)
     fun getGnss(mask: Int = 0xFFFF) = cmd(CommPacketId.GET_GNSS) { i16(mask) }
     fun pingCan() = cmd(CommPacketId.PING_CAN)
+    fun getDecodedAdc() = cmd(CommPacketId.GET_DECODED_ADC)
+    fun getDecodedPpm() = cmd(CommPacketId.GET_DECODED_PPM)
     fun alive() = cmd(CommPacketId.ALIVE)
 
     /** Wrap any request so it is executed by the VESC with [canId] behind the connected one. */

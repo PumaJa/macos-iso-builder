@@ -29,6 +29,7 @@ erforderlich · **NS** = Nicht unterstützt.
 | Batteriestrombegrenzung | – | `l_in_current_max` | IT / IH |
 | Rekuperation / Motorbremse (Stärke) | ja | Regen-Anteil (`l_watt_min`, `l_in_current_min`) | IT / IH |
 | Motorbremse beim Gaswegnehmen (Engine braking) | ja | benötigt LispBM-Gasgriffsteuerung | TI |
+| LispBM-Fahrmodusverwaltung + lokales Derating | – | `lispbm/kinetic.lisp`, Protokoll v2 | IT (141 Assertions im echten LispBM-Interpreter) / IH |
 | Gaskurve / progressive Leistungsentfaltung | ja (10-Punkt-Kurve) | Kurvenmodell + Vorschau; Ausführung am Fahrzeug nur per LispBM-Gasgriffsteuerung | TI |
 | Angenäherte Charaktere 125/250 2T, 250/450 4T | – | als „≈ Näherung“ gekennzeichnet | TI |
 | Virtuelle Schwungmasse | ja | gesperrt bis Hardwarevalidierung | HW |
@@ -46,13 +47,14 @@ erforderlich · **NS** = Nicht unterstützt.
 | Motor-/Batterieleistung, Ströme, Spannung | Batterie = berechnet; Motorleistung = geschätzt | IT / IH |
 | Ah/Wh verbraucht, rekuperiert | gemessen (Zähler der Fahrt) | IT / IH |
 | MOSFET-/Motortemperatur, Fehlercodes (35 Codes) | gemessen | IT / IH |
-| Gasgriffstellung | nicht in GET_VALUES → „nicht verfügbar“ | TI |
+| Gasgriffstellung | `COMM_GET_DECODED_ADC` (ADC-App); bei anderer Eingabe „nicht verfügbar“ | IT / IH |
 | GPS, Höhe, GPS-Speed | LocationManager (ohne Play-Dienste) | IH |
 | Beschleunigung, G-Kräfte, Neigung | VESC-IMU wenn vorhanden, sonst berechnete Längsbeschleunigung | IH |
 | Restreichweite, Wh/km | geschätzt/berechnet, gekennzeichnet | IT |
 | Wirkungsgrad | bewusst nicht angezeigt (nicht zuverlässig bestimmbar) | NS |
 | BMS: Zellen, min/max/Δ, Temperaturen, SoC, SoH, Status | `COMM_BMS_GET_VALUES` | IT (Parser) / HW (VESC-BMS) |
 | Ladezyklen | nur Gesamt-Ah/Wh-Zähler des BMS verfügbar | TI |
+| Kilometerstand (VESC-intern, stromausfallsicher) | `COMM_GET_VALUES_SETUP` odometer | IT / IH |
 | Kennzeichnung gemessen/berechnet/geschätzt/simuliert | überall | IT |
 | Anpassbare/adaptive Abfragerate | 1–50 Hz + Backoff | IT |
 
@@ -65,7 +67,7 @@ erforderlich · **NS** = Nicht unterstützt.
 | Streckenkarte + Wiedergabe | IH |
 | Vergleich mehrerer Fahrten / Fahrprofile | TI (Ausrichtung nach Fahrtfortschritt) |
 | CSV / JSON / GPX Export | IT |
-| Video-Telemetrie-Overlay | TI – Live-Overlay-Vorschau mit Sync-Offset + SRT-Export zum Einbrennen im Videoeditor; kein MP4-Rendering in der App |
+| Video-Telemetrie-Overlay | Vorschau mit Sync-Offset, **MP4-Export mit eingebranntem Overlay in der App (Media3 Transformer)**, SRT-Export | IT (Robolectric + Emulator-Instrumentierung, siehe TEST_RESULTS) |
 
 ## Gruppenfahrten
 | Funktion | Stark | Kinetic OS | Status |
@@ -84,7 +86,7 @@ erforderlich · **NS** = Nicht unterstützt.
 | Live-Position/-Speed/Akku/Temperaturen/Motorstatus aus der Ferne (2. Handy, Browser) | IT (Server+Dashboard Integrationstest) / IH |
 | Letzter bekannter Zustand mit Zeitstempel, ehrliche Offline-Anzeige | IT |
 | Fahrtenhistorie, Kilometerstand (aus Fahrten), Wartungsintervalle | IH |
-| Geofencing, Diebstahl-/Bewegungs-, Akku-, Fehlerbenachrichtigungen | IT (Server) – Anzeige in App/Dashboard; Push nicht implementiert |
+| Geofencing, Diebstahl-/Bewegungs-, Akku-, Fehlerbenachrichtigungen | IT – Android-Benachrichtigungen live (WebSocket) + Hintergrundabfrage alle 15 min (WorkManager), ohne Fremd-Pushdienst |
 | Fernsteuerung des Motors | NS (bewusst) |
 | Ortung bei ausgeschaltetem Handy/VESC | HW (GPS-Tracker nötig) |
 
@@ -95,7 +97,7 @@ erforderlich · **NS** = Nicht unterstützt.
 | Offline-Karten (Region herunterladen) | IH – Nutzungsbedingungen Tile-Anbieter beachten |
 | GPX-Import/-Export, Wegpunkte, Entfernungsmessung, Routenplanung (Luftlinie/Offroad) | IT (Logik) / IH |
 | Routenführung entlang GPX (Abstand, Richtung, Off-Route) | IT (Logik) / IH |
-| Turn-by-Turn-Straßennavigation | NS (benötigt Routing-Engine, z.B. BRouter/OSRM) |
+| Turn-by-Turn-Straßennavigation | IT (Parser/Führung) / IH – selbst gehosteter OSRM (Compose-Profil `routing`), Abbiegehinweise, automatische Neuberechnung |
 | Höhenprofil, Kartenrotation nach Fahrtrichtung, mehrere Fahrzeuge | IH |
 
 ## Racing

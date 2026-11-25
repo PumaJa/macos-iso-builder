@@ -20,6 +20,8 @@ data class Capabilities(
     val mcConfTemp: Boolean = false,
     val stats: Boolean = false,
     val gnss: Boolean = false,
+    val adc: Boolean = false,
+    val odometer: Boolean = false,
     val firmwareSupportedForWrites: Boolean = false,
 )
 
@@ -103,6 +105,8 @@ class VehicleConnection(
         caps = caps.copy(
             imu = probe { c.imu() }, bms = probe { c.bms() }, stats = probe { c.stats() },
             gnss = probe { val g = c.gnss(); require(g.lat != null) },
+            adc = probe { c.decodedAdc() },
+            odometer = probe { require(c.setupValues().odometerM != null) },
         )
         // Configuration backup BEFORE any write is ever possible.
         var mc: McConfTemp? = null
@@ -116,17 +120,19 @@ class VehicleConnection(
         val eng = TelemetryEngine(drivetrain, simulated = t.kind == TransportKind.SIMULATION).also { engine = it }
         val poller = AdaptivePoller(minMs = 1000L / 50, start = 1000L / pollHz.coerceIn(1, 50))
         var misses = 0; var tick = 0
-        var imu: ImuData? = null; var bms: BmsValues? = null
+        var imu: ImuData? = null; var bms: BmsValues? = null; var adc: DecodedAdc? = null; var odo: Long? = null
         while (isActive && t.state.value is LinkState.Connected) {
             val t0 = System.currentTimeMillis()
             try {
                 val v = c.values()
                 if (caps.imu && tick % 2 == 0) imu = runCatching { c.imu() }.getOrNull()
                 if (caps.bms && tick % 10 == 0) bms = runCatching { c.bms() }.getOrNull()
+                if (caps.adc && tick % 2 == 1) adc = runCatching { c.decodedAdc() }.getOrNull()
+                if (caps.odometer && tick % 50 == 0) odo = runCatching { c.setupValues().odometerM }.getOrNull() ?: odo
                 val rtt = System.currentTimeMillis() - t0
                 poller.onSuccess(rtt); misses = 0; _linkHealthy.value = true
                 _lastValues.value = v
-                _sample.value = eng.process(System.currentTimeMillis(), v, gps.fix.value, imu, bms, 1 + caps.canIds.size)
+                _sample.value = eng.process(System.currentTimeMillis(), v, gps.fix.value, imu, bms, 1 + caps.canIds.size, adc, odo)
             } catch (e: VescTimeoutException) {
                 poller.onTimeout(); misses++; _linkHealthy.value = misses < 2
                 if (misses >= 5) throw IllegalStateException("VESC not responding")

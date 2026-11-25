@@ -48,7 +48,10 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
 
     fun resetTrip() { whAtStart = null; whChgAtStart = null; ahAtStart = null; tachAtStart = null; maxSpeedMps = 0.0; distanceM = 0.0; movingTimeMs = 0; maxPowerW = 0.0 }
 
-    fun process(t: Long, v: VescValues?, gps: GpsFix?, imu: ImuData?, bms: BmsValues?, controllers: Int = 1): TelemetrySample {
+    fun process(
+        t: Long, v: VescValues?, gps: GpsFix?, imu: ImuData?, bms: BmsValues?, controllers: Int = 1,
+        adc: DecodedAdc? = null, odometerM: Long? = null,
+    ): TelemetrySample {
         val mq = if (simulated) Quality.SIMULATED else Quality.MEASURED
         val cq = if (simulated) Quality.SIMULATED else Quality.CALCULATED
         val eq = if (simulated) Quality.SIMULATED else Quality.ESTIMATED
@@ -97,7 +100,10 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
             wattHoursCharged = Q.of(v?.let { it.wattHoursCharged - (whChgAtStart ?: 0.0) }, mq),
             ampHoursCharged = Q.of(v?.ampHoursCharged, mq),
             tempMosC = Q.of(v?.tempMosC, mq), tempMotorC = Q.of(v?.tempMotorC?.takeIf { it > -50 }, mq),
-            duty = Q.of(v?.dutyCycle, mq), throttle = Q.NA, // VESC does not report throttle in GET_VALUES; ADC needs GET_DECODED_ADC
+            duty = Q.of(v?.dutyCycle, mq),
+            // ADC app decoded level (COMM_GET_DECODED_ADC). Only meaningful if the throttle is wired to the VESC ADC input.
+            throttle = Q.of(adc?.level?.coerceIn(-1.0, 1.0), mq),
+            odometerKm = Q.of(odometerM?.div(1000.0), mq),
             faultCode = v?.fault ?: 0, faultName = v?.faultCode?.name,
             tachAbs = v?.tachometerAbs?.toLong(), gps = gps,
             accelG = accelG,

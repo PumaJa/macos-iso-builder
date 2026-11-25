@@ -30,10 +30,31 @@ services:
       DATABASE_URL: postgres://kinetic:${POSTGRES_PASSWORD:-change-me-too}@db:5432/kinetic
       TRUST_PROXY: ${TRUST_PROXY:-0}
       DATA_DIR: /data
+      # Only used when the optional routing profile is running (see README "Road routing")
+      OSRM_URL: ${OSRM_URL:-http://osrm:5000}
     volumes:
       - api_data:/data
     ports:
       - "${API_PORT:-8080}:8080"
+
+  # Optional self-hosted road routing (OSRM). Enable with: --profile routing
+  # Prepare the map data first:  ./osrm/prepare.sh europe/liechtenstein
+  # Not published on the host; the API reverse-proxies it at GET /api/v1/route.
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
+    profiles: ["routing"]
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "--max-viaroute-size", "25", "/data/region.osrm"]
+    volumes:
+      - ./osrm-data:/data:ro
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   backup:
     image: postgres:16-alpine

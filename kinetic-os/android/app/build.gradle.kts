@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.maplibre)
     implementation(libs.datastore)
     implementation(libs.coil)
+    implementation(libs.media3.transformer)
+    implementation(libs.media3.effect)
+    implementation(libs.media3.common)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
@@ -81,4 +84,8 @@ dependencies {
     testImplementation(libs.compose.ui.test)
     debugImplementation(libs.compose.ui.test.manifest)
     testImplementation(libs.room.testing)
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation(kotlin("test"))
 }

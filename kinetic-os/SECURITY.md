@@ -15,8 +15,8 @@
 
 ## App security
 * HTTPS enforced by `network_security_config` (cleartext only for localhost/emulator/`.local`/`.lan`/`home.arpa` during NAS setup).
-* JWT stored in app-private DataStore (not exported, `allowBackup` covers only app data). Device encryption protects at rest.
-  Hardening option: move to Android Keystore-backed encryption (KNOWN_ISSUES).
+* JWT encrypted with AES-256-GCM using a non-exportable Android Keystore key (`TokenCipher`), stored in app-private DataStore.
+* CSV exports neutralise spreadsheet formula injection (`=`, `+`, `-`, `@` prefixed text cells).
 * BLE: VESC modules use their own pairing/PIN (`COMM_SET_BLE_PIN`); the app does not weaken it. BLE link-layer encryption
   depends on the module.
 * No remote motor control endpoint exists on the server or in the app (verified by server test `no control endpoints`).

@@ -64,10 +64,12 @@ private fun Maintenance(v: VehicleProfile) {
     val g = LocalContext.current.graph; val p = LocalPalette.current
     val items by g.db.nav().maintenance(v.id).collectAsStateWithLifecycle(emptyList())
     val rides by g.db.rides().all().collectAsStateWithLifecycle(emptyList())
-    val odo = remember(rides) { rides.filter { it.vehicleId == v.id && !it.simulated }.sumOf { r -> r.summaryJson?.let { runCatching { org.kineticos.app.core.AppJson.decodeFromString<org.kineticos.export.RideSummary>(it).distanceM }.getOrNull() } ?: 0.0 } / 1000 }
+    val liveOdo = g.connection.sample.collectAsStateWithLifecycle().value?.takeIf { !it.simulated }?.odometerKm?.value
+    val recordedKm = remember(rides) { rides.filter { it.vehicleId == v.id && !it.simulated }.sumOf { r -> r.summaryJson?.let { runCatching { org.kineticos.app.core.AppJson.decodeFromString<org.kineticos.export.RideSummary>(it).distanceM }.getOrNull() } ?: 0.0 } / 1000 }
+    val odo = liveOdo ?: recordedKm
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }; var interval by remember { mutableStateOf("") }
-    SectionTitle("Maintenance – ${v.name} · %.0f km recorded".format(odo))
+    SectionTitle("Maintenance – ${v.name} · %.0f km (%s)".format(odo, if (liveOdo != null) "VESC odometer" else "recorded rides"))
     items.forEach { m ->
         val due = m.lastDoneKm + m.intervalKm - odo
         Row(verticalAlignment = Alignment.CenterVertically) {

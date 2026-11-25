@@ -105,6 +105,9 @@ object Parsers {
         return VescStats(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10])
     }
 
+    fun decodedAdc(p: ByteArray): DecodedAdc { val r = VescReader(p); return DecodedAdc(r.f32(1e6), r.f32(1e6), r.f32(1e6), r.f32(1e6)) }
+    fun decodedPpm(p: ByteArray): DecodedPpm { val r = VescReader(p); return DecodedPpm(r.f32(1e6), r.f32(1e6)) }
+
     fun batteryCut(p: ByteArray): BatteryCut { val r = VescReader(p); return BatteryCut(r.f32(1e3), r.f32(1e3)) }
 
     fun pingCan(p: ByteArray): List<Int> = p.map { it.toInt() and 0xFF }
