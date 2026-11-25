@@ -28,7 +28,7 @@ enum class Screen(val label: String, val icon: ImageVector) {
     DASH("Dash", Icons.Filled.Speed), MAP("Map", Icons.Filled.Map), MODES("Modes", Icons.Filled.Tune),
     LIVE("Telemetry", Icons.Filled.MonitorHeart), RIDES("Rides", Icons.Filled.Timeline), GROUP("Group", Icons.Filled.Groups),
     RACE("Race", Icons.Filled.Flag), GARAGE("Garage", Icons.Filled.TwoWheeler), CONNECT("Connect", Icons.Filled.Bluetooth),
-    REMOTE("Remote", Icons.Filled.Satellite), SETTINGS("Settings", Icons.Filled.Settings),
+    REMOTE("Remote", Icons.Filled.Satellite), SETUP("VESC Setup", Icons.Filled.Build), SETTINGS("Settings", Icons.Filled.Settings),
 }
 
 @Composable
@@ -75,6 +75,8 @@ fun KineticRoot(activity: MainActivity) {
         activity.window.attributes = lp
     }
 
+    val pip by activity.inPip.collectAsStateWithLifecycle()
+    if (pip) { KineticTheme(settings.theme, false) { PipDash() }; return }
     KineticTheme(settings.theme, settings.gloveMode) {
         val p = LocalPalette.current
         val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
@@ -127,7 +129,36 @@ private fun ScreenHost(screen: Screen, activity: MainActivity, go: (Screen) -> U
             Screen.GARAGE -> GarageScreen()
             Screen.CONNECT -> ConnectScreen()
             Screen.REMOTE -> RemoteScreen()
+            Screen.SETUP -> SetupScreen()
             Screen.SETTINGS -> SettingsScreen()
+        }
+    }
+}
+
+/** Compact cockpit for picture-in-picture: speed, power, battery, mode, warnings. */
+@Composable
+fun PipDash() {
+    val g = androidx.compose.ui.platform.LocalContext.current.graph
+    val p = LocalPalette.current
+    val s by g.connection.sample.collectAsStateWithLifecycle()
+    val applied by g.appliedProfile.collectAsStateWithLifecycle()
+    val warn by g.warnings.history.collectAsStateWithLifecycle()
+    val recent = warn.firstOrNull()?.takeIf { System.currentTimeMillis() - it.ts < 15_000 }
+    Box(Modifier.fillMaxSize().background(if (recent?.level == org.kineticos.telemetry.WarnLevel.CRITICAL) K.Danger else p.bg).padding(6.dp)) {
+        Column {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(fmt(s?.speedMps ?: org.kineticos.telemetry.Q.NA, 0, 3.6), style = numStyle(44), color = qColor((s?.speedMps ?: org.kineticos.telemetry.Q.NA).quality, p.text))
+                Text(" km/h", style = labelStyle(9), color = p.textDim)
+                Spacer(Modifier.weight(1f))
+                Text(applied?.name ?: "STOCK", style = labelStyle(12), color = K.Accent)
+            }
+            Row {
+                Text(fmt(s?.batteryPowerW ?: org.kineticos.telemetry.Q.NA, 1, 0.001) + " kW", style = labelStyle(12), color = K.Accent)
+                Spacer(Modifier.weight(1f))
+                Text(fmt(s?.socPct ?: org.kineticos.telemetry.Q.NA, 0) + "%", style = labelStyle(12), color = p.text)
+            }
+            recent?.let { Text(it.text, style = labelStyle(10), color = Color.White, maxLines = 1) }
+            if (s?.simulated == true) Text("SIMULATION", style = labelStyle(9), color = K.Sim)
         }
     }
 }

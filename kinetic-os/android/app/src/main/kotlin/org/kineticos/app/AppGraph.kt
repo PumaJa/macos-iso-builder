@@ -40,6 +40,7 @@ class AppGraph(val ctx: Context) {
     val recorder = RideRecorder(db, scope)
     val api = Api({ settings.value.serverUrl }, { settings.value.authToken })
     val socket = LiveSocket(api, { settings.value.serverUrl }, { settings.value.authToken }, scope)
+    val warnings = org.kineticos.app.alerts.WarningCenter(ctx, scope, connection, settings)
 
     val vehicles: StateFlow<List<VehicleProfile>> = db.vehicles().all()
         .map { l -> l.mapNotNull { runCatching { AppJson.decodeFromString<VehicleProfile>(it.json) }.getOrNull() } }
@@ -66,8 +67,10 @@ class AppGraph(val ctx: Context) {
         if (started) return; started = true
         gps.start()
         scope.launch { connection.events.collect { _toast.emit(it) } }
+        warnings.start()
         // keep drivetrain in sync with the active vehicle
-        scope.launch { activeVehicle.collect { v -> v?.let { connection.drivetrain = Drivetrain(it.motorPolePairs, it.gearRatio, it.wheelDiameterM, it.batteryCellsSeries, it.batteryCapacityAh, it.batteryNominalV) } } }
+        scope.launch { activeVehicle.collect { v -> v?.let { connection.drivetrain = Drivetrain(it.motorPolePairs, it.gearRatio, it.wheelDiameterM, it.batteryCellsSeries, it.batteryCapacityAh, it.batteryNominalV,
+                chemistry = runCatching { org.kineticos.telemetry.Chemistry.valueOf(it.batteryChemistry) }.getOrDefault(org.kineticos.telemetry.Chemistry.NMC)) } } }
         scope.launch { settings.collect { connection.pollHz = if (it.powerSaver) minOf(it.pollHz, 4) else it.pollHz } }
         // auto record: start when online, stop when link is gone for good
         scope.launch {
@@ -97,6 +100,7 @@ class AppGraph(val ctx: Context) {
         val factory: () -> VescTransport
         when {
             spec == "sim" -> factory = { SimulatedVescTransport() }
+            spec == "sim-script" -> factory = { SimulatedVescTransport(scriptInstalled = true) }
             spec.startsWith("ble:") -> { val addr = spec.removePrefix("ble:"); factory = { BleVescTransport(ctx, addr) } }
             spec.startsWith("tcp:") -> {
                 val parts = spec.removePrefix("tcp:").split(":"); val h = parts[0]; val port = parts.getOrNull(1)?.toIntOrNull() ?: 65102
@@ -152,6 +156,7 @@ class AppGraph(val ctx: Context) {
         val s = connection.sample.value
         val live = LiveState(connection.lastValues.value?.erpm, s?.speedMps?.value?.times(3.6), s?.faultCode ?: 0, connection.linkHealthy.value,
             s?.tempMosC?.value, s?.tempMotorC?.value, s?.socPct?.value)
+        connection.scriptStatus.value?.let { st -> return applyViaScript(c, target, v, live, st) }
         val (derate, _) = if (target.tempDerate || target.socDerate) Derating.factor(if (target.tempDerate) live.tempMosC else null, if (target.tempDerate) live.tempMotorC else null, if (target.socDerate) live.socPct else null) else (1.0 to emptyList())
         return when (val d = gate.planRideMode(connection.capabilities.value.firmware, connection.backup.value, appliedProfile.value, target, v, live, derate)) {
             is GateDecision.Denied -> "Not applied: " + d.reasons.joinToString("; ")
@@ -164,9 +169,37 @@ class AppGraph(val ctx: Context) {
         }
     }
 
+    /** On-vehicle script present: send the mode to the script (it keeps its ceiling and does local derating). */
+    private suspend fun applyViaScript(c: org.kineticos.vesc.client.VescClient, target: RideProfile, v: VehicleProfile, live: LiveState, st: ScriptStatus): String =
+        when (val d = gate.planScriptMode(connection.capabilities.value.firmware, connection.backup.value, appliedProfile.value, target, v, live, st.mode)) {
+            is ScriptDecision.Denied -> "Not applied: " + d.reasons.joinToString("; ")
+            is ScriptDecision.Plan -> try {
+                val p = d.plan
+                val r1 = OnVehicleScript.parseStatus(c.writeAckedChecked(p.setParams, p.tokens.first))
+                if (r1 == null || r1.result != 0) "Vehicle script refused parameters: ${r1?.resultText ?: "no reply"}"
+                else {
+                    val r2 = OnVehicleScript.parseStatus(c.writeAckedChecked(p.select, p.tokens.second))
+                    r2?.let { connection.updateScript(it) }
+                    if (r2 == null || r2.result != 0) "Vehicle script refused mode: ${r2?.resultText ?: "no reply"}"
+                    else {
+                        _appliedProfile.value = target
+                        settingsRepo.update { it.copy(activeProfileId = target.id) }
+                        "Applied " + p.summary + (if (p.warnings.isNotEmpty()) "\n" + p.warnings.joinToString("\n") else "")
+                    }
+                }
+            } catch (e: Exception) { "Write failed – vehicle keeps previous mode (${e.message})" }
+        }
+
     suspend fun restoreStock(): String {
         val c = connection.client ?: return "Not connected"
         val b = connection.backup.value ?: return "No backup available"
+        connection.scriptStatus.value?.let { st ->
+            val v = activeVehicle.value ?: return "Create a vehicle first"
+            // full fractions = the script's boot ceiling = stored limits; reductions are always allowed by the gate
+            val r = applyViaScript(c, SafetyGate.STOCK, v, LiveState(null, 0.0, 0, connection.linkHealthy.value, null, null, null), st)
+            if (r.startsWith("Applied")) _appliedProfile.value = null
+            return r
+        }
         return when (val d = gate.planRestore(b, LiveState(null, null, 0, connection.linkHealthy.value, null, null, null))) {
             is GateDecision.Denied -> d.reasons.joinToString()
             is GateDecision.Allowed -> runCatching { c.writeAckedChecked(d.payload, d.token); _appliedProfile.value = null; "Stored limits restored" }.getOrElse { "Restore failed: ${it.message}" }
@@ -178,6 +211,7 @@ class AppGraph(val ctx: Context) {
         while (true) {
             delay(2000)
             val p = appliedProfile.value ?: continue
+            if (connection.scriptStatus.value != null) continue // the on-vehicle script derates locally
             val s = connection.sample.value ?: continue
             val (f, why) = Derating.factor(if (p.tempDerate) s.tempMosC.value else null, if (p.tempDerate) s.tempMotorC.value else null, if (p.socDerate) s.socPct.value else null)
             val stationary = (s.speedMps.value ?: 0.0) * 3.6 < 2.0

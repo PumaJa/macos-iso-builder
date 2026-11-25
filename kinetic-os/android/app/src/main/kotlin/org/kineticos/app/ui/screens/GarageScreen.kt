@@ -136,6 +136,10 @@ private fun VehicleEditor(initial: VehicleProfile, done: () -> Unit) {
             Field("Nominal V", num("v", v.batteryNominalV), { f["v"] = it; v = v.copy(batteryNominalV = it.toD()) }, Modifier.weight(1f), true, err("batteryNominalV")); Spacer(Modifier.width(6.dp))
             Field("Cells (S)", num("s", v.batteryCellsSeries), { f["s"] = it; v = v.copy(batteryCellsSeries = it.toIntOrNull()) }, Modifier.weight(1f), true, err("batteryCellsSeries"))
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+            org.kineticos.telemetry.Chemistry.entries.forEach { c -> BigButton(c.label, Modifier.weight(1f), selected = v.batteryChemistry == c.name, compact = true) { v = v.copy(batteryChemistry = c.name) } }
+        }
+        Text("Chemistry selects the voltage curve. With capacity set, SoC is coulomb-counted (Ah) from a resting-voltage anchor – much better for flat LiFePO4 curves.", color = p.textDim, style = labelStyle(10))
         Row {
             Field("Max power W", num("pw", v.maxPowerW), { f["pw"] = it; v = v.copy(maxPowerW = it.toD()) }, Modifier.weight(1f), true, err("maxPowerW")); Spacer(Modifier.width(6.dp))
             Field("Max motor A", num("ma", v.maxMotorCurrentA), { f["ma"] = it; v = v.copy(maxMotorCurrentA = it.toD()) }, Modifier.weight(1f), true, err("maxMotorCurrentA")); Spacer(Modifier.width(6.dp))

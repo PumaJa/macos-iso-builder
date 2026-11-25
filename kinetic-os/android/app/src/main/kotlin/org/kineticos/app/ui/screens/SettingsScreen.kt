@@ -38,6 +38,17 @@ fun SettingsScreen() {
             SpeedUnit.entries.forEach { u -> BigButton(u.name, Modifier.weight(1f), selected = s.speedUnit == u) { upd { it.copy(speedUnit = u) } } }
             PowerUnit.entries.forEach { u -> BigButton(u.name, Modifier.weight(1f), selected = s.powerUnit == u) { upd { it.copy(powerUnit = u) } } }
         }
+        SectionTitle("Dash")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { PrimaryValue.entries.forEach { v -> BigButton(v.name.replace('_', ' '), Modifier.weight(1f), selected = s.primaryValue == v, compact = true) { upd { it.copy(primaryValue = v) } } } }
+        Text("Dash tiles (tap to add/remove, max 6, order = tap order): " + s.dashTiles.joinToString { DASH_TILE_CATALOG[it] ?: it }, color = p.textDim, style = labelStyle(10))
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            DASH_TILE_CATALOG.forEach { (k, label) -> BigButton(label, selected = k in s.dashTiles, compact = true) {
+                upd { st -> st.copy(dashTiles = if (k in st.dashTiles) st.dashTiles - k else (st.dashTiles + k).takeLast(6)) } } }
+        }
+        Toggle("Spoken warnings", s.voiceAlerts, { v -> upd { it.copy(voiceAlerts = v) } }, "Battery steps, temperatures before cut-off, faults, connection loss")
+        Toggle("Vibrate on warnings", s.vibrateAlerts, { v -> upd { it.copy(vibrateAlerts = v) } })
+        Toggle("Mini-cockpit when leaving the app (picture-in-picture)", s.pipOnLeave, { v -> upd { it.copy(pipOnLeave = v) } }, "Keep a navigation app in front and still see speed, power, battery and mode")
         Toggle("Glove mode (large controls)", s.gloveMode, { v -> upd { it.copy(gloveMode = v) } })
         Toggle("Keep screen on", s.keepScreenOn, { v -> upd { it.copy(keepScreenOn = v) } })
         LabeledSlider("Dim when idle & stationary", s.dimAfterIdleS.toFloat(), { v -> upd { it.copy(dimAfterIdleS = v.toInt()) } }, 0f..600f, { if (it < 1) "off" else "%.0f s".format(it) })

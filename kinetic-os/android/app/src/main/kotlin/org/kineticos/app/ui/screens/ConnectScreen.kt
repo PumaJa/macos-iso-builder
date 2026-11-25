@@ -42,6 +42,7 @@ fun ConnectScreen() {
             Text("Last: ${settings.lastTransport ?: "—"}", color = p.textDim)
             Toggle("Auto-connect on start", settings.autoConnect, { v -> scope.launch { g.settingsRepo.update { it.copy(autoConnect = v) } } })
             BigButton("DISCONNECT", Modifier.fillMaxWidth(), color = K.Danger) { g.disconnect() }
+            if (status is ConnStatus.Online) Text("Tip: More → VESC Setup checks the controller configuration.", color = p.textDim, style = labelStyle(10))
         }
         SectionTitle("Bluetooth LE")
         BigButton(if (scanJob == null) "SCAN" else "STOP SCAN", Modifier.fillMaxWidth(), selected = scanJob != null) {
@@ -74,5 +75,6 @@ fun ConnectScreen() {
         SectionTitle("Simulation")
         Text("Starts a virtual VESC for testing. All data is marked SIMULATION and is never sent as real telematics.", color = p.textDim)
         BigButton("START SIMULATOR", Modifier.fillMaxWidth(), color = K.Sim) { g.connectTo("sim") }
+        BigButton("SIMULATOR + VEHICLE SCRIPT", Modifier.fillMaxWidth().padding(top = 6.dp), color = K.Sim) { g.connectTo("sim-script") }
     }
 }

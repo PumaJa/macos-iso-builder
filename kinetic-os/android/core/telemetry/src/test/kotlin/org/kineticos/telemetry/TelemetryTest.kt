@@ -79,3 +79,76 @@ class ThrottleOdometerTest {
         kotlin.test.assertFalse(none.throttle.isAvailable); kotlin.test.assertFalse(none.odometerKm.isAvailable)
     }
 }
+
+class BatteryEstimationTest {
+    private fun v(volt: Double, ah: Double, ahChg: Double = 0.0, iIn: Double = 0.5, erpm: Double = 0.0, wh: Double = 0.0) =
+        org.kineticos.vesc.model.VescValues(30.0, 30.0, 0.0, iIn, 0.0, 0.0, 0.0, erpm, volt, ah, ahChg, wh, 0.0, 0, 0, 0, null, null, null, null, null, null, null, null)
+
+    @kotlin.test.Test fun coulombCountingFollowsAhNotVoltageSag() {
+        val dt = Drivetrain(7, 8.0, 0.5, batteryCellsSeries = 20, batteryCapacityAh = 20.0, batteryNominalV = 72.0)
+        val e = TelemetryEngine(dt, false)
+        val s0 = e.process(0, v(82.0, 0.0), null, null, null)          // 4.1 V/cell at rest → 95 %
+        kotlin.test.assertEquals(95.0, s0.socPct.value!!, 0.01); kotlin.test.assertEquals("coulomb", e.socSource)
+        // heavy load: voltage sags to 3.6 V/cell, but only 2 Ah used → 95 − 10 = 85 % (voltage-only would say 25 %)
+        val s1 = e.process(1000, v(72.0, 2.0, iIn = 150.0), null, null, null)
+        kotlin.test.assertEquals(85.0, s1.socPct.value!!, 0.01); kotlin.test.assertEquals(Quality.ESTIMATED, s1.socPct.quality)
+        // regen gives charge back
+        kotlin.test.assertEquals(87.5, e.process(2000, v(80.0, 2.0, ahChg = 0.5, iIn = -20.0), null, null, null).socPct.value!!, 0.01)
+    }
+
+    @kotlin.test.Test fun lfpCurveIsUsedForFlatChemistry() {
+        kotlin.test.assertEquals(70.0, Calc.socFromCellVoltage(3.3, Chemistry.LFP), 1e-9)
+        kotlin.test.assertTrue(Calc.socFromCellVoltage(3.3, Chemistry.NMC) < 10)
+        val e = TelemetryEngine(Drivetrain(7, 8.0, 0.5, batteryCellsSeries = 16, chemistry = Chemistry.LFP), false)
+        kotlin.test.assertEquals(70.0, e.process(0, v(52.8, 0.0), null, null, null).socPct.value!!, 0.01)
+        kotlin.test.assertEquals("voltage", e.socSource) // no capacity → voltage only
+    }
+
+    @kotlin.test.Test fun rangeUsesRollingConsumption() {
+        val dt = Drivetrain(7, 8.0, 0.5, batteryCellsSeries = 20, batteryCapacityAh = 20.0, batteryNominalV = 72.0)
+        val e = TelemetryEngine(dt, false)
+        val erpm = 56000.0; val mps = Calc.wheelSpeedMps(erpm, dt) // ≈26 m/s
+        var t = 0L; var wh = 0.0; var last: TelemetrySample? = null
+        // first 3 km at 30 Wh/km, then 3 km at 90 Wh/km → rolling window must reflect the recent higher consumption
+        repeat(3600) { i -> t += 100; val km = mps * 0.1 / 1000; wh += km * (if (e.distanceM < 3000) 30.0 else 90.0)
+            last = e.process(t, v(82.0, 0.0, wh = wh, iIn = 0.5, erpm = erpm), null, null, null) }
+        val rolling = e.rollingWhPerKm()!!
+        kotlin.test.assertTrue(rolling > 85, "rolling $rolling")
+        kotlin.test.assertTrue(e.whPerKm(last!!)!! < rolling)
+        kotlin.test.assertNotNull(e.rangeKm(last!!))
+    }
+}
+
+class WarningEngineTest {
+    private fun s(t: Long, soc: Double? = null, fet: Double? = null, mot: Double? = null, fault: Int = 0) = TelemetrySample(t = t, simulated = false,
+        socPct = Q.of(soc, Quality.ESTIMATED), tempMosC = Q.of(fet, Quality.MEASURED), tempMotorC = Q.of(mot, Quality.MEASURED), faultCode = fault,
+        faultName = if (fault == 6) "OVER_TEMP_MOTOR" else null)
+
+    @kotlin.test.Test fun batteryStepsFireOnceDownward() {
+        val w = WarningEngine()
+        kotlin.test.assertTrue(w.evaluate(s(0, soc = 80.0)).isEmpty())
+        kotlin.test.assertEquals(listOf("Battery 30 percent"), w.evaluate(s(1, soc = 29.0)).map { it.text })
+        kotlin.test.assertTrue(w.evaluate(s(2, soc = 28.0)).isEmpty())
+        val crit = w.evaluate(s(3, soc = 9.5)).single()
+        kotlin.test.assertEquals(WarnLevel.CRITICAL, crit.level); kotlin.test.assertEquals("Battery 10 percent", crit.text)
+    }
+
+    @kotlin.test.Test fun motorTempEarlyWarningWithHysteresisAndFaults() {
+        val w = WarningEngine()
+        kotlin.test.assertEquals("Motor temperature 101 degrees", w.evaluate(s(0, mot = 101.0)).single().text)
+        kotlin.test.assertTrue(w.evaluate(s(1, mot = 98.0)).isEmpty())     // within hysteresis → no re-fire later
+        kotlin.test.assertTrue(w.evaluate(s(2, mot = 102.0)).isEmpty())
+        w.evaluate(s(3, mot = 90.0))                                         // cleared
+        kotlin.test.assertEquals(1, w.evaluate(s(4, mot = 100.5)).size)
+        val f = w.evaluate(s(5, mot = 100.5, fault = 6)).single()
+        kotlin.test.assertEquals(WarnLevel.CRITICAL, f.level); kotlin.test.assertEquals("Controller fault: over temp motor", f.text)
+        kotlin.test.assertTrue(w.evaluate(s(6, fault = 6)).isEmpty())
+    }
+
+    @kotlin.test.Test fun linkLossOnlyWhenMoving() {
+        val w = WarningEngine()
+        kotlin.test.assertNull(w.linkLost(0, 0.0, false))
+        kotlin.test.assertNotNull(w.linkLost(0, 30.0, false)); kotlin.test.assertNull(w.linkLost(1, 30.0, false))
+        w.linkRestored(); kotlin.test.assertNotNull(w.linkLost(2, 30.0, false))
+    }
+}

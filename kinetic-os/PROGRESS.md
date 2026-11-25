@@ -19,3 +19,6 @@
 | 2026-11-25 | Throttle (ADC), odometer, Keystore token, CSV injection guard | tests green |
 | 2026-11-25 | Alert notifications (WS + WorkManager) | Robolectric test green |
 | 2026-11-25 | Turn-by-turn client, MP4 overlay export (Media3) | unit tests green; export instrumented on emulator |
+| 2026-11-25 | Forum research (subagent) + decisions | docs/USER_WISHES.md, 9 wishes built, 3 declined with reasons |
+| 2026-11-25 | PiP cockpit, warnings (TTS/vibration), dash tiles, sun theme, chemistry + coulomb SoC | tests green |
+| 2026-11-25 | App ↔ on-vehicle script bridge, VESC setup check, kinetic.vescpkg (subagent built VESC Tool 7.01) | E2E via simulator green |

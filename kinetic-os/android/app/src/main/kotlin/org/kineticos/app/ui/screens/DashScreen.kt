@@ -19,6 +19,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kineticos.app.core.ConnStatus
 import org.kineticos.app.data.PowerUnit
+import org.kineticos.app.data.PrimaryValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import org.kineticos.app.data.SpeedUnit
 import org.kineticos.app.graph
 import org.kineticos.app.ui.*
@@ -54,6 +57,7 @@ fun DashScreen(go: (Screen) -> Unit) {
     val simulated = s?.simulated == true
     val engine = g.connection.engine
     val range = s?.let { engine?.rangeKm(it) }
+    val script by g.connection.scriptStatus.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().padding(12.dp)) {
         // status strip
@@ -84,17 +88,27 @@ fun DashScreen(go: (Screen) -> Unit) {
             Column(m, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.fillMaxWidth(0.95f).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
                     PowerArc((kotlin.math.abs(pw) / maxP).toFloat(), pw < 0, Modifier.fillMaxSize(), simulated)
-                    val sp = s?.speedMps ?: Q.NA
+                    val (mainQ, mainScale, mainLabel) = when (settings.primaryValue) {
+                        PrimaryValue.SPEED -> Triple(s?.speedMps ?: Q.NA, speedScale, "$speedUnit · ${s?.speedSource?.uppercase() ?: "—"}")
+                        PrimaryValue.POWER -> Triple(power, pScale, "$pUnit · ${qTag(power.quality)}")
+                        PrimaryValue.BATTERY_CURRENT -> Triple(s?.batteryCurrentA ?: Q.NA, 1.0, "A battery · ${qTag((s?.batteryCurrentA ?: Q.NA).quality)}")
+                    }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(fmt(sp, 0, speedScale), style = numStyle(if (landscape) 110 else 96, FontWeight.Thin), color = qColor(sp.quality, p.text), maxLines = 1)
-                        Text("$speedUnit · ${s?.speedSource?.uppercase() ?: "—"}", style = labelStyle(12), color = p.textDim)
+                        Text(fmt(mainQ, 0, mainScale), style = numStyle(if (landscape) 110 else 96, if (p.sun) FontWeight.Bold else FontWeight.Thin), color = qColor(mainQ.quality, p.text), maxLines = 1)
+                        Text(mainLabel, style = labelStyle(12), color = p.textDim)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(fmt(power, 1, pScale), style = numStyle(40), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
-                    Text(" $pUnit  ${if (pw < 0) "REGEN" else "POWER"}", style = labelStyle(12), color = p.textDim)
+                    if (settings.primaryValue == PrimaryValue.SPEED) {
+                        Text(fmt(power, 1, pScale), style = numStyle(40), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
+                        Text(" $pUnit  ${if (pw < 0) "REGEN" else "POWER"}", style = labelStyle(12), color = p.textDim)
+                    } else {
+                        Text(fmt(s?.speedMps ?: Q.NA, 0, speedScale), style = numStyle(40), color = qColor((s?.speedMps ?: Q.NA).quality, K.Accent))
+                        Text(" $speedUnit", style = labelStyle(12), color = p.textDim)
+                    }
                 }
+                ModeBadge(applied, script)
             }
         }
         val side: @Composable (Modifier) -> Unit = { m ->
@@ -108,15 +122,8 @@ fun DashScreen(go: (Screen) -> Unit) {
                         Text("${qTag(soc.quality)} · ${range?.let { "≈%.0f km range (EST)".format(it) } ?: "range n/a"}", style = labelStyle(10), color = p.textDim)
                     }
                 }
-                Row {
-                    Metric("Volt", s?.voltageV ?: Q.NA, "V", 1, modifier = Modifier.weight(1f))
-                    Metric("Batt A", s?.batteryCurrentA ?: Q.NA, "A", 0, modifier = Modifier.weight(1f))
-                    Metric("Motor A", s?.motorCurrentA ?: Q.NA, "A", 0, modifier = Modifier.weight(1f))
-                }
-                Row {
-                    Metric("FET", s?.tempMosC ?: Q.NA, "°C", 0, modifier = Modifier.weight(1f))
-                    Metric("Motor", s?.tempMotorC ?: Q.NA, "°C", 0, modifier = Modifier.weight(1f))
-                    Metric("Trip", Q.of(engine?.distanceM?.div(1000), if (simulated) Quality.SIMULATED else Quality.CALCULATED), "km", 1, modifier = Modifier.weight(1f))
+                settings.dashTiles.take(6).chunked(3).forEach { row ->
+                    Row { row.forEach { key -> DashTile(key, s, engine, simulated, Modifier.weight(1f)) }; repeat(3 - row.size) { Spacer(Modifier.weight(1f)) } }
                 }
                 if ((s?.faultCode ?: 0) != 0) Pill("FAULT: ${s?.faultName ?: s?.faultCode}", K.Danger, Modifier.padding(4.dp))
             }
@@ -134,6 +141,58 @@ fun DashScreen(go: (Screen) -> Unit) {
             profiles.take(4).forEach { pr ->
                 BigButton(pr.name, Modifier.weight(1f).padding(horizontal = 2.dp), selected = applied?.id == pr.id, compact = true) { scope.launch { g.toast(g.applyProfile(pr)) } }
             }
+        }
+    }
+}
+
+/** Catalog of selectable dash tiles (Settings → Dash tiles). */
+val DASH_TILE_CATALOG = linkedMapOf(
+    "VOLT" to "Voltage", "BATT_A" to "Battery current", "MOTOR_A" to "Motor current", "FET" to "Controller temp", "MOTOR_T" to "Motor temp",
+    "TRIP" to "Trip km", "ODO" to "Odometer", "WHKM" to "Wh/km (rolling)", "RANGE" to "Range", "DUTY" to "Duty", "THROTTLE" to "Throttle",
+    "LEAN" to "Lean angle", "ALT" to "Altitude", "PS" to "Power PS", "WH" to "Wh used", "REGEN" to "Wh regenerated", "AH" to "Ah used",
+)
+
+@Composable
+fun DashTile(key: String, s: org.kineticos.telemetry.TelemetrySample?, engine: org.kineticos.telemetry.TelemetryEngine?, simulated: Boolean, modifier: Modifier) {
+    val cq = if (simulated) Quality.SIMULATED else Quality.CALCULATED
+    val eq = if (simulated) Quality.SIMULATED else Quality.ESTIMATED
+    when (key) {
+        "VOLT" -> Metric("Volt", s?.voltageV ?: Q.NA, "V", 1, modifier = modifier)
+        "BATT_A" -> Metric("Batt A", s?.batteryCurrentA ?: Q.NA, "A", 0, modifier = modifier)
+        "MOTOR_A" -> Metric("Motor A", s?.motorCurrentA ?: Q.NA, "A", 0, modifier = modifier)
+        "FET" -> Metric("FET", s?.tempMosC ?: Q.NA, "°C", 0, modifier = modifier)
+        "MOTOR_T" -> Metric("Motor", s?.tempMotorC ?: Q.NA, "°C", 0, modifier = modifier)
+        "TRIP" -> Metric("Trip", Q.of(engine?.distanceM?.div(1000), cq), "km", 1, modifier = modifier)
+        "ODO" -> Metric("Odo", s?.odometerKm ?: Q.NA, "km", 0, modifier = modifier)
+        "WHKM" -> Metric("Wh/km", Q.of(engine?.rollingWhPerKm(), cq), "", 0, modifier = modifier)
+        "RANGE" -> Metric("Range", Q.of(s?.let { engine?.rangeKm(it) }, eq), "km", 0, modifier = modifier)
+        "DUTY" -> Metric("Duty", s?.duty ?: Q.NA, "%", 0, 100.0, modifier = modifier)
+        "THROTTLE" -> Metric("Throttle", s?.throttle ?: Q.NA, "%", 0, 100.0, modifier = modifier)
+        "LEAN" -> Metric("Lean", s?.leanDeg ?: Q.NA, "°", 0, modifier = modifier)
+        "ALT" -> Metric("Alt", Q.of(s?.gps?.altM, Quality.MEASURED), "m", 0, modifier = modifier)
+        "PS" -> Metric("Power", Q.of(s?.batteryPowerW?.value?.let { org.kineticos.telemetry.Calc.ps(it) }, s?.batteryPowerW?.quality ?: Quality.UNAVAILABLE), "PS", 0, modifier = modifier)
+        "WH" -> Metric("Used", s?.wattHours ?: Q.NA, "Wh", 0, modifier = modifier)
+        "REGEN" -> Metric("Regen", s?.wattHoursCharged ?: Q.NA, "Wh", 0, modifier = modifier)
+        "AH" -> Metric("Ah", s?.ampHours ?: Q.NA, "Ah", 2, modifier = modifier)
+        else -> Spacer(modifier)
+    }
+}
+
+/** Large, colour-coded mode indicator (readable at a glance) incl. on-vehicle derating state. */
+@Composable
+fun ModeBadge(applied: org.kineticos.vehicle.RideProfile?, script: org.kineticos.vehicle.ScriptStatus?) {
+    val p = LocalPalette.current
+    val name = applied?.name ?: "STOCK"
+    val col = when (applied?.id) { "eco" -> K.Regen; "race" -> K.Danger; "crawl" -> K.Warn; null -> p.textDim; else -> K.Accent }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 6.dp)) {
+        Box(Modifier.clip(RoundedCornerShape(10.dp)).background(col.copy(alpha = 0.18f)).border(2.dp, col, RoundedCornerShape(10.dp)).padding(horizontal = 18.dp, vertical = 4.dp)) {
+            Text(name, style = labelStyle(22).copy(fontWeight = FontWeight.Bold), color = col)
+        }
+        applied?.let { Text("REGEN %.0f%% · %s".format(it.regenFraction * 100, it.character.label.uppercase()), style = labelStyle(10), color = p.textDim) }
+        script?.let { sc ->
+            val why = listOfNotNull("FET".takeIf { sc.derateMosfet }, "MOTOR".takeIf { sc.derateMotor }, "VOLTAGE".takeIf { sc.derateVoltage })
+            Text(if (why.isEmpty()) "VEHICLE SCRIPT · %.0f%%".format(sc.effectiveScale * 100) else "DERATED %.0f%% · %s".format(sc.effectiveScale * 100, why.joinToString("/")),
+                style = labelStyle(10), color = if (why.isEmpty()) p.textDim else K.Warn)
         }
     }
 }

@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.map
 
 private val Context.store by preferencesDataStore("settings")
 
-enum class ThemeMode { AUTO, DAY, NIGHT }
+enum class ThemeMode { AUTO, DAY, NIGHT, SUN }   // SUN = maximum contrast for direct sunlight
+enum class PrimaryValue { SPEED, POWER, BATTERY_CURRENT }
+val DEFAULT_TILES = listOf("VOLT", "BATT_A", "MOTOR_A", "FET", "MOTOR_T", "TRIP")
 enum class SpeedUnit { KMH, MPH }
 enum class PowerUnit { KW, PS, HP }
 
@@ -37,6 +39,11 @@ data class AppSettings(
     val mapStyleNight: String = "https://tiles.openfreemap.org/styles/dark",
     val powerSaver: Boolean = false,
     val alertNotifications: Boolean = true,
+    val voiceAlerts: Boolean = true,
+    val vibrateAlerts: Boolean = true,
+    val pipOnLeave: Boolean = true,
+    val primaryValue: PrimaryValue = PrimaryValue.SPEED,
+    val dashTiles: List<String> = DEFAULT_TILES,
 )
 
 class SettingsRepo(private val ctx: Context) {
@@ -49,7 +56,8 @@ class SettingsRepo(private val ctx: Context) {
         val glove = booleanPreferencesKey("glove"); val poll = intPreferencesKey("pollHz"); val server = stringPreferencesKey("server")
         val token = stringPreferencesKey("token"); val user = stringPreferencesKey("user"); val tele = booleanPreferencesKey("telematics")
         val share = booleanPreferencesKey("share"); val styleDay = stringPreferencesKey("styleDay"); val styleNight = stringPreferencesKey("styleNight")
-        val saver = booleanPreferencesKey("saver"); val alerts = booleanPreferencesKey("alerts")
+        val saver = booleanPreferencesKey("saver"); val alerts = booleanPreferencesKey("alerts"); val voice = booleanPreferencesKey("voice"); val vib = booleanPreferencesKey("vib")
+        val pip = booleanPreferencesKey("pip"); val primary = stringPreferencesKey("primary"); val tiles = stringPreferencesKey("tiles")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -62,6 +70,9 @@ class SettingsRepo(private val ctx: Context) {
             p[K.glove] ?: d.gloveMode, p[K.poll] ?: d.pollHz, p[K.server] ?: d.serverUrl, p[K.token]?.let { TokenCipher.decrypt(it) }, p[K.user],
             p[K.tele] ?: d.telematicsEnabled, p[K.share] ?: d.shareTelemetryInGroups,
             p[K.styleDay] ?: d.mapStyleDay, p[K.styleNight] ?: d.mapStyleNight, p[K.saver] ?: d.powerSaver, p[K.alerts] ?: d.alertNotifications,
+            p[K.voice] ?: d.voiceAlerts, p[K.vib] ?: d.vibrateAlerts, p[K.pip] ?: d.pipOnLeave,
+            p[K.primary]?.let { runCatching { PrimaryValue.valueOf(it) }.getOrNull() } ?: d.primaryValue,
+            p[K.tiles]?.split(',')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: d.dashTiles,
         )
     }
     suspend fun current() = flow.first()
@@ -74,7 +85,8 @@ class SettingsRepo(private val ctx: Context) {
             put(K.kiosk, n.kiosk); put(K.theme, n.theme.name); put(K.speed, n.speedUnit.name); put(K.power, n.powerUnit.name)
             put(K.glove, n.gloveMode); put(K.poll, n.pollHz.coerceIn(1, 50)); put(K.server, n.serverUrl.trim().trimEnd('/')); put(K.token, n.authToken?.let { TokenCipher.encrypt(it) })
             put(K.user, n.username); put(K.tele, n.telematicsEnabled); put(K.share, n.shareTelemetryInGroups)
-            put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver); put(K.alerts, n.alertNotifications)
+            put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver); put(K.alerts, n.alertNotifications); put(K.voice, n.voiceAlerts); put(K.vib, n.vibrateAlerts); put(K.pip, n.pipOnLeave)
+            put(K.primary, n.primaryValue.name); put(K.tiles, n.dashTiles.take(9).joinToString(","))
         }
     }
 }

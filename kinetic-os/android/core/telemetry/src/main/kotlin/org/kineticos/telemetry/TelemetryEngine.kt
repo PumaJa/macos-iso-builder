@@ -9,7 +9,15 @@ data class Drivetrain(
     val batteryCellsSeries: Int? = null, val batteryCapacityAh: Double? = null, val batteryNominalV: Double? = null,
     /** false = no vehicle profile yet → wheel speed / motor rpm cannot be derived and are reported UNAVAILABLE. */
     val configured: Boolean = true,
+    val chemistry: Chemistry = Chemistry.NMC,
 )
+
+/** Cell chemistry → open-circuit-voltage curve. LFP/LTO curves are flat, so voltage-only SoC is poor; coulomb counting is used when capacity is known. */
+enum class Chemistry(val label: String, val curve: List<Pair<Double, Double>>) {
+    NMC("Li-ion NMC/NCA", listOf(3.0 to 0.0, 3.3 to 5.0, 3.5 to 15.0, 3.6 to 25.0, 3.7 to 45.0, 3.8 to 60.0, 3.9 to 72.0, 4.0 to 85.0, 4.1 to 95.0, 4.2 to 100.0)),
+    LFP("LiFePO4", listOf(2.5 to 0.0, 3.0 to 5.0, 3.2 to 20.0, 3.25 to 40.0, 3.3 to 70.0, 3.35 to 90.0, 3.4 to 97.0, 3.6 to 100.0)),
+    LTO("LTO", listOf(1.8 to 0.0, 2.1 to 10.0, 2.3 to 40.0, 2.4 to 60.0, 2.5 to 85.0, 2.6 to 95.0, 2.75 to 100.0)),
+}
 
 object Calc {
     fun motorRpm(erpm: Double, polePairs: Int) = erpm / polePairs
@@ -21,8 +29,8 @@ object Calc {
      * Li-ion SoC estimate from resting cell voltage (piecewise-linear typical NMC curve).
      * Only an ESTIMATE – under load voltage sags; use BMS SoC when available.
      */
-    fun socFromCellVoltage(v: Double): Double {
-        val t = listOf(3.0 to 0.0, 3.3 to 5.0, 3.5 to 15.0, 3.6 to 25.0, 3.7 to 45.0, 3.8 to 60.0, 3.9 to 72.0, 4.0 to 85.0, 4.1 to 95.0, 4.2 to 100.0)
+    fun socFromCellVoltage(v: Double, chem: Chemistry = Chemistry.NMC): Double {
+        val t = chem.curve
         if (v <= t.first().first) return 0.0
         if (v >= t.last().first) return 100.0
         val i = t.indexOfLast { it.first <= v }
@@ -38,6 +46,12 @@ object Calc {
 class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean) {
     private var whAtStart: Double? = null; private var whChgAtStart: Double? = null; private var ahAtStart: Double? = null
     private var tachAtStart: Long? = null
+    // coulomb counting anchor: SoC estimated from (ideally resting) voltage at connect + raw VESC Ah counters at that moment
+    private var socAnchor: Double? = null; private var ahAnchor = 0.0; private var ahChgAnchor = 0.0
+    // rolling consumption window: (distance m, net Wh) checkpoints
+    private val window = ArrayDeque<Pair<Double, Double>>()
+    var socSource: String = "none"; private set
+    private var anchoredAtRest = false
     private var lastSpeed: Double? = null; private var lastT: Long? = null
     private var smoothedAccel = 0.0
 
@@ -81,10 +95,28 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         }
         lastSpeed = speed; lastT = t
 
+        val cells = drivetrain.batteryCellsSeries
+        val cap = drivetrain.batteryCapacityAh
+        if (v != null && cells != null && socAnchor == null && !v.inputVoltageV.isNaN()) {
+            // prefer a resting anchor (|I| < 2 A); otherwise accept the first sample and re-anchor when the pack rests
+            socAnchor = Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry); ahAnchor = v.ampHours; ahChgAnchor = v.ampHoursCharged
+            anchoredAtRest = abs(v.inputCurrentA) < 2.0
+        } else if (v != null && cells != null && !anchoredAtRest && abs(v.inputCurrentA) < 2.0) {
+            socAnchor = Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry); ahAnchor = v.ampHours; ahChgAnchor = v.ampHoursCharged; anchoredAtRest = true
+        }
         val soc: Q = when {
-            bms != null && bms.soc in 0.0..1.0 -> Q(bms.soc * 100, mq)
-            v != null && drivetrain.batteryCellsSeries != null -> Q.of(Calc.socFromCellVoltage(v.inputVoltageV / drivetrain.batteryCellsSeries!!), eq)
-            else -> Q.NA
+            bms != null && bms.soc in 0.0..1.0 -> { socSource = "bms"; Q(bms.soc * 100, mq) }
+            v != null && socAnchor != null && cap != null && cap > 0 -> {
+                socSource = "coulomb"
+                val used = (v.ampHours - ahAnchor) - (v.ampHoursCharged - ahChgAnchor)
+                Q.of((socAnchor!! - used / cap * 100).coerceIn(0.0, 100.0), eq)
+            }
+            v != null && cells != null -> { socSource = "voltage"; Q.of(Calc.socFromCellVoltage(v.inputVoltageV / cells, drivetrain.chemistry), eq) }
+            else -> { socSource = "none"; Q.NA }
+        }
+        if (v != null) {
+            val net = (v.wattHours - (whAtStart ?: 0.0)) - (v.wattHoursCharged - (whChgAtStart ?: 0.0))
+            if (window.isEmpty() || distanceM - window.last().first >= 100) { window.addLast(distanceM to net); while (window.size > 51) window.removeFirst() }
         }
         val accelG = imu?.accX?.takeIf { !it.isNaN() }?.let { Q(it, mq) } ?: if (speed != null && dtMs > 0) Q(smoothedAccel, cq) else Q.NA
         return TelemetrySample(
@@ -121,11 +153,19 @@ class TelemetryEngine(var drivetrain: Drivetrain, private val simulated: Boolean
         return if (distanceM < 100) null else (wh - whc) / (distanceM / 1000)
     }
 
-    /** Remaining range ESTIMATE: usable Wh left / trip consumption. */
+    /** Consumption over the last ≈5 km (rolling), falling back to the trip average; null until 1 km of data. */
+    fun rollingWhPerKm(): Double? {
+        if (window.size < 2) return null
+        val (d0, e0) = window.first(); val (d1, e1) = window.last()
+        val km = (d1 - d0) / 1000
+        return if (km < 1.0) null else ((e1 - e0) / km).takeIf { it > 1 }
+    }
+
+    /** Remaining range ESTIMATE: usable Wh left / rolling consumption (trip average if the window is too short). */
     fun rangeKm(s: TelemetrySample): Double? {
         val soc = s.socPct.value ?: return null
         val capWh = drivetrain.batteryCapacityAh?.let { ah -> drivetrain.batteryNominalV?.let { ah * it } } ?: return null
-        val c = whPerKm(s)?.takeIf { it > 1 } ?: return null
+        val c = rollingWhPerKm() ?: whPerKm(s)?.takeIf { it > 1 } ?: return null
         return capWh * soc / 100 / c
     }
 }

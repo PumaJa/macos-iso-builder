@@ -22,6 +22,7 @@ data class Capabilities(
     val gnss: Boolean = false,
     val adc: Boolean = false,
     val odometer: Boolean = false,
+    val script: Boolean = false,          // lispbm/kinetic.lisp answers on CUSTOM_APP_DATA
     val firmwareSupportedForWrites: Boolean = false,
 )
 
@@ -50,6 +51,11 @@ class VehicleConnection(
     private val _backup = MutableStateFlow<McConfBackup?>(null); val backup: StateFlow<McConfBackup?> = _backup
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 32); val events: SharedFlow<String> = _events
     private val _linkHealthy = MutableStateFlow(false); val linkHealthy: StateFlow<Boolean> = _linkHealthy
+    private val _script = MutableStateFlow<ScriptStatus?>(null); val scriptStatus: StateFlow<ScriptStatus?> = _script
+    private val _batteryCut = MutableStateFlow<BatteryCut?>(null); val batteryCut: StateFlow<BatteryCut?> = _batteryCut
+    fun updateScript(s: ScriptStatus?) { _script.value = s }
+    private suspend fun queryScript(c: VescClient): ScriptStatus? =
+        runCatching { OnVehicleScript.parseStatus(c.customAppQuery(OnVehicleScript.wrap(OnVehicleScript.statusRequest()))) }.getOrNull()
 
     var client: VescClient? = null; private set
     var transport: VescTransport? = null; private set
@@ -90,7 +96,7 @@ class VehicleConnection(
         }
     }
 
-    fun stop() { job?.cancel(); job = null; _status.value = ConnStatus.Idle; _linkHealthy.value = false }
+    fun stop() { job?.cancel(); job = null; _status.value = ConnStatus.Idle; _linkHealthy.value = false; _script.value = null }
 
     private suspend fun session(c: VescClient, t: VescTransport): Unit = coroutineScope {
         val fw = c.firmware()
@@ -108,6 +114,9 @@ class VehicleConnection(
             adc = probe { c.decodedAdc() },
             odometer = probe { require(c.setupValues().odometerM != null) },
         )
+        _script.value = queryScript(c)
+        caps = caps.copy(script = _script.value != null)
+        _batteryCut.value = runCatching { c.batteryCut() }.getOrNull()
         // Configuration backup BEFORE any write is ever possible.
         var mc: McConfTemp? = null
         caps = caps.copy(mcConfTemp = probe { mc = c.mcConfTemp() })
@@ -128,6 +137,7 @@ class VehicleConnection(
                 if (caps.imu && tick % 2 == 0) imu = runCatching { c.imu() }.getOrNull()
                 if (caps.bms && tick % 10 == 0) bms = runCatching { c.bms() }.getOrNull()
                 if (caps.adc && tick % 2 == 1) adc = runCatching { c.decodedAdc() }.getOrNull()
+                if (caps.script && tick % 20 == 5) queryScript(c)?.let { _script.value = it }
                 if (caps.odometer && tick % 50 == 0) odo = runCatching { c.setupValues().odometerM }.getOrNull() ?: odo
                 val rtt = System.currentTimeMillis() - t0
                 poller.onSuccess(rtt); misses = 0; _linkHealthy.value = true

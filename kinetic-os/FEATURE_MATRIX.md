@@ -117,6 +117,19 @@ erforderlich · **NS** = Nicht unterstützt.
 | Handschuh-Modus, Tag/Nacht/Auto, Energiesparmodus, Abdunkeln im Stand | IT (UI-Render) / IH |
 | Samsung/ältere Geräte (minSdk 26, keine Play-Dienste) | IH |
 
+## Aus Nutzerwünschen (Foren, siehe docs/USER_WISHES.md)
+| Funktion | Status |
+|---|---|
+| Bild-im-Bild-Minicockpit über Navi-Apps | IH |
+| Frühwarnungen (Motor-/FET-Temperatur vor Abschaltung, Akkustufen, Zelldrift, Verbindungsverlust) mit Sprachausgabe/Vibration + Verlauf | IT (Logik) / IH |
+| Großer Modus-Indikator inkl. Derating-Status vom Fahrzeug | IT (Render) |
+| Frei wählbare Cockpit-Kacheln, Hauptwert wählbar, Sonnenlicht-Theme | IT (Render) / IH |
+| Zellchemie NMC/LFP/LTO, Coulomb-Zählung, gleitender Verbrauch für Reichweite | IT |
+| VESC-Einrichtungscheck (nur lesend) + Antriebsdaten-Import | IT |
+| Fahrmodi über das Fahrzeugskript (keine Konkurrenz App ↔ Skript) | IT (Simulator-E2E) / IH |
+| VESC-Paket `kinetic.vescpkg` (mit VESC Tool 7.01 gebaut) | TI – gebaut und strukturell geprüft, nicht in VESC Tool geladen |
+| Diebstahlsperre ohne Handy | HW (Hardwarevalidierung nötig) |
+
 ## Was NICHT nachgebildet wird
 Originale Stark-Grafiken, Logos, Schriften, Fahrzeugdarstellung, Menütexte oder Quellcode (urheber-/markenrechtlich geschützt,
 keine APK bereitgestellt). Das UI ist eine eigenständige Gestaltung nach demselben Bedienkonzept (großes Tacho, Modus-Schnellwahl,

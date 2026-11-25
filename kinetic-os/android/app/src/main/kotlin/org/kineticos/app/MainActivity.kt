@@ -29,6 +29,20 @@ class MainActivity : ComponentActivity() {
     val deepLinkJoin = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
     /** Screen requested by a notification (e.g. telematics alert → REMOTE). */
     val openScreen = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 1)
+    val inPip = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** Leaving the app (e.g. to a navigation app) → shrink to a picture-in-picture mini cockpit while connected. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= 26 && graph.settings.value.pipOnLeave && graph.connection.status.value is org.kineticos.app.core.ConnStatus.Online) {
+            runCatching { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16, 9)).build()) }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip.value = isInPictureInPictureMode
+    }
 
     private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startCockpit() }
 

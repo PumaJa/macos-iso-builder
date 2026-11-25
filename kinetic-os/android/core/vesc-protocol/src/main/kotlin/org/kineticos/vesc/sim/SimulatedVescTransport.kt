@@ -18,6 +18,8 @@ class SimulatedVescTransport(
     var corruptEveryNth: Int = 0,       // fault injection: flip a CRC byte
     var fragmentSize: Int = 20,         // emulate BLE MTU fragmentation
     val fwMajor: Int = 6, val fwMinor: Int = 6,
+    /** Emulate lispbm/kinetic.lisp (protocol v2) answering COMM_CUSTOM_APP_DATA. */
+    val scriptInstalled: Boolean = false,
 ) : VescTransport {
     override val kind = TransportKind.SIMULATION
     private val _state = MutableStateFlow<LinkState>(LinkState.Disconnected)
@@ -39,6 +41,39 @@ class SimulatedVescTransport(
     val polePairs = 7; val gear = 8.0; val wheelD = 0.48
     val writesReceived = mutableListOf<Int>()
     var odometerStartM = 1_234_000L
+
+    // --- emulated on-vehicle script (mirrors kinetic.lisp semantics; ceiling = limits at "boot") ---
+    private val ceilScale = 1.0; private val ceilWatt = 15000.0; private val ceilErpm = 50000.0
+    private data class SMode(val scale: Double, val watt: Double, val erpm: Double)
+    private val sModes = arrayOf(SMode(0.4, 6000.0, 30000.0), SMode(0.7, 10500.0, 50000.0), SMode(1.0, 15000.0, 50000.0), SMode(0.5, 7500.0, 50000.0), SMode(0.5, 7500.0, 50000.0))
+    var scriptMode = 1; private set
+    private var lastReject = 0
+    private fun scriptReply(ver: Int, cmd: Int, res: Int): ByteArray {
+        val w = VescWriter(18).u8(CommPacketId.CUSTOM_APP_DATA.id).u8(0x4B).u8(ver).u8(cmd).u8(res).u8(scriptMode)
+            .i16((maxScale / ceilScale * 1000).toInt()).u8(0).u8(lastReject).u8(tempFet.toInt()).u8(tempMotor.toInt())
+            .i16((voltage() * 10).toInt()).i32(erpm.toInt())
+        return w.toByteArray()
+    }
+    private fun applyMode(m: SMode) { maxScale = m.scale.coerceAtMost(ceilScale); wattMax = m.watt.coerceAtMost(ceilWatt); maxErpm = m.erpm.coerceAtMost(ceilErpm) }
+    private fun handleScript(d: ByteArray): ByteArray? {
+        if (d.size < 3 || (d[0].toInt() and 0xFF) != 0x4B) return null
+        val ver = d[1].toInt() and 0xFF; if (ver !in 1..2) return null
+        val cmd = d[2].toInt() and 0xFF; val r = VescReader(d, 3)
+        val moving = abs(erpm) >= 300
+        val res = when (cmd) {
+            3 -> 0
+            1 -> { if (d.size < 4) 4 else { val i = r.u8(); val cur = sModes[scriptMode]
+                    when { i > 4 -> 2; moving && (sModes[i].scale > cur.scale || sModes[i].watt > cur.watt || sModes[i].erpm > cur.erpm) -> 3
+                        else -> { scriptMode = i; applyMode(sModes[i]); 0 } } } }
+            2 -> { val need = if (ver == 2) 16 else 14
+                if (d.size < need) 4 else { val slot = r.u8(); val sc = r.u16() / 1000.0; val wt = if (ver == 2) r.u32().toDouble() else r.u16().toDouble()
+                    r.u16(); val er = r.u32().toDouble()
+                    if (slot != 3 && slot != 4) 6 else { sModes[slot] = SMode(sc.coerceAtMost(ceilScale), wt.coerceAtMost(ceilWatt), er.coerceAtMost(ceilErpm)); 0 } } }
+            else -> 5
+        }
+        lastReject = if (res == 0) 0 else res
+        return scriptReply(ver, cmd, res)
+    }
 
     override suspend fun connect() { _state.value = LinkState.Connecting; _state.value = LinkState.Connected("SIMULATED VESC") }
     override suspend fun disconnect() { _state.value = LinkState.Disconnected }
@@ -123,6 +158,11 @@ class SimulatedVescTransport(
                 w.u8(cells.size); cells.forEach { w.f16(it, 1e3) }; cells.forEach { _ -> w.u8(0) }
                 w.u8(2).f16(28.0, 1e2).f16(29.0, 1e2).f16(30.0, 1e2).f16(0.0, 1e2).f16(0.0, 1e2).f16(29.0, 1e2)
                 w.f16(0.9, 1e3).f16(0.97, 1e3).u8(10)
+            }
+            CommPacketId.CUSTOM_APP_DATA -> {
+                if (!scriptInstalled) return
+                val reply = handleScript(req.copyOfRange(1, req.size)) ?: return
+                w.bytes(reply)
             }
             CommPacketId.ALIVE -> return
             else -> return // unsupported → no reply (like real firmware for unknown ids)

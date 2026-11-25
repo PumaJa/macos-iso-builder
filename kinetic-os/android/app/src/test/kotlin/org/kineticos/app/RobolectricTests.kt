@@ -103,6 +103,7 @@ class UiSimulationTest {
         assertTrue(g.connection.sample.value!!.simulated)
         compose.waitUntil(10_000) { compose.onAllNodesWithText("SIM").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("SIM")[0].assertExists()
+        compose.waitForIdle(); Thread.sleep(800)
         shot("dash_simulation")
         // ECO is less powerful than stock → allowed; the safety gate writes RAM-only limits
         val msg = runBlocking { g.applyProfile(RideProfile.ECO) }
@@ -132,5 +133,24 @@ class UiSimulationTest {
         screen = 1; compose.waitForIdle(); compose.onNodeWithText("+ ADD VEHICLE").assertExists(); shot("garage")
         screen = 2; compose.waitForIdle(); compose.onNodeWithText("Glove mode", substring = true).assertExists(); shot("settings")
         screen = 3; compose.waitForIdle(); compose.onNodeWithText("START SIMULATOR").assertExists(); shot("connect")
+    }
+
+    @Test fun modesGoThroughOnVehicleScriptWhenInstalledAndSetupCheckRenders() {
+        val g = ctx.graph
+        g.startRuntime()
+        runBlocking { g.saveVehicle(VehicleProfile("veh2", "Script MX", motorPolePairs = 7, gearRatio = 8.0, wheelDiameterM = 0.48, batteryCellsSeries = 20,
+            batteryCapacityAh = 30.0, batteryNominalV = 72.0, maxPowerW = 15000.0)); g.selectVehicle("veh2") }
+        g.connectTo("sim-script")
+        waitFor { g.connection.capabilities.value.script && g.connection.backup.value != null && g.connection.drivetrain.gearRatio == 8.0 }
+        val msg = runBlocking { g.applyProfile(RideProfile.ECO) }
+        assertTrue(msg.startsWith("Applied") && msg.contains("on-vehicle script"), msg)
+        val st = g.connection.scriptStatus.value!!
+        assertTrue(st.mode == 3 || st.mode == 4, "custom slot selected: $st"); assertEquals(0, st.result)
+        assertEquals(0.5, st.effectiveScale, 0.01)
+        compose.setContent { KineticTheme(ThemeMode.NIGHT, true) { SetupScreen() } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("On-vehicle script", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("kinetic.lisp answers", substring = true).assertExists()
+        shot("vesc_setup_check")
+        g.disconnect()
     }
 }

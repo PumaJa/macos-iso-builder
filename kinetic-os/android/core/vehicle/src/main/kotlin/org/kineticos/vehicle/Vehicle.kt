@@ -24,6 +24,7 @@ data class VehicleProfile(
     val batteryCapacityAh: Double? = null,
     val batteryNominalV: Double? = null,
     val batteryCellsSeries: Int? = null,
+    val batteryChemistry: String = "NMC",   // NMC | LFP | LTO
     val maxPowerW: Double? = null,
     val maxMotorCurrentA: Double? = null,
     val maxBatteryCurrentA: Double? = null,

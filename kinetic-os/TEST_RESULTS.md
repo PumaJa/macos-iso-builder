@@ -9,14 +9,14 @@ Three levels, kept strictly apart:
 | Suite | Tests | Result | Covers |
 |---|---|---|---|
 | core:vesc-protocol | 24 | ✅ | CRC vector, framing (short/long/very long), random fragmentation, corruption + resync, garbage fuzz, float32_auto, GET_VALUES (FW 6/7 + old FW), FW_VERSION, BMS, MCCONF_TEMP layout, FORWARD_CAN, **DECODED_ADC**, simulator: CAN, retries, CRC injection, timeout, WriteToken, **odometer/throttle** |
-| core:telemetry | 11 | ✅ | speed from ERPM, units, quality tags, GPS fallback, energy/distance, range, SoC curve, adaptive poller, unconfigured drivetrain, **throttle/odometer tagging** |
-| core:vehicle | 11 | ✅ | SafetyGate (never exceeds backup, RAM-only, standstill rule, refusals, locked assistance, derating, restore), throttle curves, validation |
+| core:telemetry | 17 | ✅ | **+ coulomb counting, LFP curve, rolling range, WarningEngine (battery steps, temperature early warnings, faults, link loss)** · speed from ERPM, units, quality tags, GPS fallback, energy/distance, range, SoC curve, adaptive poller, unconfigured drivetrain, **throttle/odometer tagging** |
+| core:vehicle | 18 | ✅ | **+ VESC setup check, drivetrain import, on-vehicle script codec (byte-exact vs protocol.md), script plans** · SafetyGate (never exceeds backup, RAM-only, standstill rule, refusals, locked assistance, derating, restore), throttle curves, validation |
 | core:racing | 35 | ✅ | geo, gate crossings, laps 1/10 Hz, sectors, ghost, accel, leaderboard |
 | core:export | 26 | ✅ | CSV/JSON/GPX round trips, XXE rejection, ride summary, **CSV formula-injection guard** |
-| app (JVM + Robolectric) | 20 | ✅ | REST/WS (reconnect), telematics mapping, Room recorder, route guidance, **OSRM parsing + turn-by-turn**, **alert notifications (dedupe, channel)**, **overlay timeline + renderer**, Compose UI with simulator |
+| app (JVM + Robolectric) | 21 | ✅ | **+ E2E: simulator with emulated kinetic.lisp → mode applied via script, setup check renders** · REST/WS (reconnect), telematics mapping, Room recorder, route guidance, **OSRM parsing + turn-by-turn**, **alert notifications (dedupe, channel)**, **overlay timeline + renderer**, Compose UI with simulator |
 | server (vitest) | 50 | ✅ | incl. **/route OSRM proxy (7 tests)** and integration against postgis/postgis:16-3.4 |
 | LispBM (real LispBM 0.41 interpreter) | 141 + 5 smoke | ✅ | ceiling, mode accept/reject rules, clamping, derating, rate limiter, status byte layout, protocol v1/v2 |
-| **Total** | **318** | ✅ | |
+| **Total** | **337** (141 Android + 50 server + 146 LispBM) | ✅ | |
 
 Bugs found by these tests and fixed: decoder stall on corrupted length field; SafetyGate refusing ECO from stock while moving;
 WebSocket not reconnecting after server-initiated close; simulated BMS values tagged MEAS; meaningless wheel speed without vehicle profile.

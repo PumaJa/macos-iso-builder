@@ -13,6 +13,16 @@
 
 Important: the ceiling is read with `conf-get` at script start. The script never calls `conf-store`, so limits revert on reboot. If you re-upload while the script was already running and has reduced limits, power-cycle the VESC first, otherwise the lowered values become the new ceiling.
 
+## Install as VESC package
+A VESC Tool package description lives in `vesc_pkg/kinetic/` (format of vedderb/vesc_pkg). `kinetic.lisp` stays the single source; the Makefile copies it at build time.
+
+Build (needs the `vesc_tool` command-line binary, GPL-3.0, from vedderb/vesc_tool or an installed VESC Tool):
+```
+cd vesc_pkg/kinetic
+make VESC_TOOL=/path/to/vesc_tool     # writes kinetic.vescpkg and dist/kinetic.vescpkg
+```
+Install: connect to the VESC, open **VESC Packages** (sidebar), use **Load Custom** / **Install from file** and pick `kinetic.vescpkg`, then press **Install**. Alternative without a package: use the manual LispBM upload described under Install. The package only shows as compatible on motor controllers (not VESC BMS / Express). After installing, check the script is set to run on boot, and read the warning at the top: it is not validated on hardware.
+
 ## Behaviour
 - Boot: reads `l-current-max-scale`, `l-watt-max`, `l-in-current-max`, `l-max-erpm`, `l-battery-cut-start` as the **hard ceiling**. Every applied value is `min(value, ceiling)`. Starts in mode 0 (eco).
 - Modes: 0 eco, 1 sport, 2 race, 3 custom1, 4 custom2. Default table = fractions of the ceiling (eco 40%, sport 70%, race 100%, custom 50%/60%). Mode scale is a fraction of the boot current scale.

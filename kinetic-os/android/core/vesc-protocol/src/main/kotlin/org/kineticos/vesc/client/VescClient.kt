@@ -123,7 +123,9 @@ class VescClient(
 
     /** Raw write with acknowledgement. Never retried. Use only via the security layer (RideModeApplier). */
     internal suspend fun writeAcked(payload: ByteArray, timeoutMs: Long = 1500) = request(payload, timeoutMs = timeoutMs, retries = 0)
-    suspend fun writeAckedChecked(payload: ByteArray, token: WriteToken) { token.consume(); writeAcked(payload) }
+    suspend fun writeAckedChecked(payload: ByteArray, token: WriteToken): ByteArray { token.consume(); return writeAcked(payload) }
+    /** Read-only query of the on-vehicle script (COMM_CUSTOM_APP_DATA); returns the raw reply data or throws on timeout. */
+    suspend fun customAppQuery(payload: ByteArray, timeoutMs: Long = 800) = request(payload, replyId = CommPacketId.CUSTOM_APP_DATA.id, timeoutMs = timeoutMs, retries = 0)
 }
 
 /**

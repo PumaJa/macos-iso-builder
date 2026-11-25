@@ -74,6 +74,12 @@ fun LiveScreen() {
  if (b.temps.isNotEmpty()) Text((if (sim) "[SIM] " else "") + "Pack temps: " + b.temps.joinToString { "%.1f°C".format(it) }, color = p.text)
             b.status?.let { Text("BMS status: $it", color = p.textDim) }
         } ?: Text(if (caps.bms) "BMS: waiting for data" else "BMS: not detected (no COMM_BMS_GET_VALUES reply)", color = p.textDim, modifier = Modifier.padding(top = 8.dp))
+        val warnHist by g.warnings.history.collectAsStateWithLifecycle()
+        SectionTitle("Warnings (${warnHist.size})")
+        if (warnHist.isEmpty()) Text("No warnings this session.", color = p.textDim)
+        warnHist.take(20).forEach { w -> Text(java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date(w.ts)) + "  " + (if (w.simulated) "[SIM] " else "") + w.text,
+            color = when (w.level) { org.kineticos.telemetry.WarnLevel.CRITICAL -> K.Danger; org.kineticos.telemetry.WarnLevel.WARN -> K.Warn; else -> p.text }) }
+        if (warnHist.isNotEmpty()) BigButton("CLEAR WARNINGS", Modifier.padding(top = 4.dp)) { g.warnings.clearHistory() }
         SectionTitle("Controller & link")
         Card(Modifier.fillMaxWidth()) {
             Text("HW ${caps.firmware?.hardwareName ?: "—"} · FW ${caps.firmware?.versionString ?: "—"} ${caps.firmware?.firmwareName ?: ""}", color = p.text)
