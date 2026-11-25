@@ -27,3 +27,4 @@
 | 2026-11-25 | Full test run + gallery (17 screens), emulator, web dashboard with data; swipe mode change + curve point editor | all green; 3 bugs found & fixed |
 | 2026-11-25 | Stark feature set from user images: home, stats (airtime/g-force), M1–M5 with PS/kW, riding time, neutral, parental lock, brightness, FR/IT/ES/SV (subagent), VargLink invite links | all green (see TEST_RESULTS) |
 | 2026-11-25 | Redesign (greyscale, Barlow Condensed, own K mark), landscape layouts, personalisation (background, logo, name, accent), new lock screen with PIN pad | see TEST_RESULTS |
+| 2026-11-25 | Premium pass: Barlow light numerals, hairlines; no nav bars (hub + back arrow); home tiles selectable with own photos; text size | all green |

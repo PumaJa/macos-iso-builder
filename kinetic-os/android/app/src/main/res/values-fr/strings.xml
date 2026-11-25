@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Antidémarrage actif</string>
     <string name="lock_chip_persist">Reste après extinction</string>
     <string name="lock_enter_pin">Saisir le PIN pour déverrouiller</string>
+    <string name="nav_back">Retour</string>
+    <string name="set_home_tiles">Tuiles de l’écran d’accueil</string>
+    <string name="set_tile_images_hint">Astuce : appui long sur une tuile pour choisir votre photo.</string>
+    <string name="set_tile_images_reset">Réinitialiser les photos des tuiles</string>
+    <string name="set_text_scale">Taille du texte</string>
 </resources>

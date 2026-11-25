@@ -99,7 +99,7 @@ open class GalleryTest {
         pump(3000)
         runBlocking { g.applyProfile(RideProfile.ECO) }
         pump(6000)
-        open("HOME", 4000); shot("00_start")
+        open("HOME", 7000); shot("00_start")
         open("DASH"); shot("01_cockpit")
         open("LIVE"); shot("02_telemetrie")
         open("MODES"); shot("03_fahrmodi")
@@ -141,7 +141,7 @@ open class GalleryTest {
         open("DASH", 2500); shot("16_diebstahlsperre_alarm")
         g.disconnect(); pump(1000)
         // personalisation: own background image, own name next to the logo
-        runBlocking { g.settingsRepo.update { it.copy(bgImage = drawnPhoto(), bgDim = 0.72f, brandName = "MX TEAM") } }
+        runBlocking { g.settingsRepo.update { drawnPhoto().let { ph -> it.copy(bgImage = ph, bgDim = 0.72f, brandName = "MX TEAM", tileImages = mapOf("STATS" to ph, "TRAILS" to ph)) } } }
         open("HOME", 3000); shot("17_eigenes_design")
         open("SETTINGS", 2000); shot("18_design_einstellungen")
     }

@@ -143,7 +143,9 @@ erforderlich · **NS** = Nicht unterstützt.
 | Diebstahlsperre (Bike Lock) | siehe oben |
 | Bildschirmhelligkeit in der App | IH |
 | Sprachen DE/EN/FR/IT/ES/SV | IT (Lint) – FR/IT/ES/SV maschinell, Review nötig |
-| Eigenes Design-System: nur Schwarz → Weiß (Graustufen), Schrift Barlow Condensed (OFL), eigenes K-Logo | IT (Render) |
+| Eigenes Design-System: nur Schwarz → Weiß (Graustufen), Schrift Barlow (OFL), feine Linien, eigenes K-Logo | IT (Render) |
+| Navigation ohne Leisten: Startseite als Zentrale, Zurück-Pfeil oben links + System-Zurück | IT (Render) |
+| Startseite anpassbar: Kacheln wählen, eigenes Foto pro Kachel (lange drücken), Textgröße | IT (Render) / IH (Bildauswahl) |
 | Querformat (Lenkerhalterung): 3-spaltiges Cockpit, geteilte Startseite; Ausrichtung Quer/Hoch/Auto | IT (Render quer + hoch) |
 | Personalisierung: Hintergrundbild + Abdunklung, eigenes Logo, eigener Name, Akzent-Helligkeit | IT (Render) / IH (Bildauswahl) |
 | Sperrbildschirm: animierter Sicherheitsring, Alarmbalken bei Bewegung, PIN-Feld direkt auf dem Bildschirm | IT (Render, Simulator-E2E) |

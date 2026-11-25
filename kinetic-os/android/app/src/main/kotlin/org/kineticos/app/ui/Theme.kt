@@ -41,17 +41,19 @@ data class Brand(val logo: String? = null, val name: String = "KINETIC")
 val LocalBrand = staticCompositionLocalOf { Brand() }
 
 val Mono = FontFamily.Monospace
-/** Barlow Condensed (SIL OFL 1.1, docs/licenses) – display face for numbers, labels and titles. */
+/** Barlow (SIL OFL 1.1, docs/licenses) – one calm, modern grotesk for everything. */
 val Display = FontFamily(
-    Font(R.font.barlow_condensed_regular, FontWeight.Normal), Font(R.font.barlow_condensed_medium, FontWeight.Medium),
-    Font(R.font.barlow_condensed_semibold, FontWeight.SemiBold), Font(R.font.barlow_condensed_bold, FontWeight.Bold),
-    Font(R.font.barlow_condensed_extrabold, FontWeight.ExtraBold),
+    Font(R.font.barlow_light, FontWeight.Light), Font(R.font.barlow_regular, FontWeight.Normal),
+    Font(R.font.barlow_medium, FontWeight.Medium), Font(R.font.barlow_semibold, FontWeight.SemiBold),
 )
-/** Legacy callers pass Light/Medium; condensed numbers read best semibold or heavier. */
-fun numStyle(size: Int, weight: FontWeight = FontWeight.SemiBold) =
-    TextStyle(fontFamily = Display, fontWeight = if (weight.weight < 600) FontWeight.SemiBold else weight, fontSize = size.sp, letterSpacing = 0.sp)
-fun labelStyle(size: Int = 12) = TextStyle(fontFamily = Display, fontWeight = FontWeight.SemiBold, fontSize = (size + 2).sp, letterSpacing = 1.2.sp)
-fun titleStyle(size: Int = 28) = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = size.sp, letterSpacing = 0.5.sp)
+/** Numbers: light for large values (premium instrument look), medium only when asked for emphasis. */
+fun numStyle(size: Int, weight: FontWeight = FontWeight.Light) =
+    TextStyle(fontFamily = Display, fontWeight = if (size >= 40) FontWeight.Light else if (weight.weight >= 600) FontWeight.Medium else FontWeight.Normal,
+        fontSize = size.sp, letterSpacing = if (size >= 40) (-1).sp else 0.sp)
+/** Small uppercase labels with generous tracking. */
+fun labelStyle(size: Int = 12) = TextStyle(fontFamily = Display, fontWeight = FontWeight.Medium, fontSize = size.sp, letterSpacing = 1.6.sp)
+/** Titles: light at large sizes, regular below. */
+fun titleStyle(size: Int = 28) = TextStyle(fontFamily = Display, fontWeight = if (size >= 30) FontWeight.Light else FontWeight.Normal, fontSize = size.sp, letterSpacing = 0.3.sp)
 
 @Composable
 fun KineticTheme(mode: ThemeMode, glove: Boolean, accentLevel: Float = 0.95f, brand: Brand = Brand(), content: @Composable () -> Unit) {
@@ -69,7 +71,10 @@ fun KineticTheme(mode: ThemeMode, glove: Boolean, accentLevel: Float = 0.95f, br
             K.Regen = Color(0xFF333333); K.Warn = Color(0xFF444444); K.Danger = Color.Black; K.Sim = Color(0xFF6E6E73); K.Estimated = Color(0xFF666666) }
     }
     CompositionLocalProvider(LocalPalette provides p, LocalGlove provides glove, LocalBrand provides brand) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme, typography = Typography().let { t ->
+            t.copy(bodyLarge = t.bodyLarge.copy(fontFamily = Display), bodyMedium = t.bodyMedium.copy(fontFamily = Display), bodySmall = t.bodySmall.copy(fontFamily = Display),
+                titleLarge = t.titleLarge.copy(fontFamily = Display), titleMedium = t.titleMedium.copy(fontFamily = Display), labelLarge = t.labelLarge.copy(fontFamily = Display))
+        }, content = content)
     }
 }
 

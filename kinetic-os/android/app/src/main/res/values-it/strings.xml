@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Immobilizzatore attivo</string>
     <string name="lock_chip_persist">Resta dopo lo spegnimento</string>
     <string name="lock_enter_pin">Inserisci il PIN per sbloccare</string>
+    <string name="nav_back">Indietro</string>
+    <string name="set_home_tiles">Riquadri nella schermata iniziale</string>
+    <string name="set_tile_images_hint">Suggerimento: tieni premuto un riquadro per usare una tua foto.</string>
+    <string name="set_tile_images_reset">Ripristina foto dei riquadri</string>
+    <string name="set_text_scale">Dimensione testo</string>
 </resources>

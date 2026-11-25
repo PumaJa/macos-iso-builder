@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Startspärr aktiv</string>
     <string name="lock_chip_persist">Kvar efter avstängning</string>
     <string name="lock_enter_pin">Ange PIN för att låsa upp</string>
+    <string name="nav_back">Tillbaka</string>
+    <string name="set_home_tiles">Rutor på startskärmen</string>
+    <string name="set_tile_images_hint">Tips: tryck länge på en ruta för att använda ett eget foto.</string>
+    <string name="set_tile_images_reset">Återställ rutbilder</string>
+    <string name="set_text_scale">Textstorlek</string>
 </resources>

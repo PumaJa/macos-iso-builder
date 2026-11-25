@@ -52,7 +52,7 @@ fun PowerArc(fraction: Float, regen: Boolean, modifier: Modifier = Modifier, sim
     val p = LocalPalette.current
     val anim by animateFloatAsState(fraction.coerceIn(0f, 1f), spring(stiffness = Spring.StiffnessMediumLow), label = "arc")
     Canvas(modifier) {
-        val stroke = size.minDimension * 0.085f
+        val stroke = size.minDimension * 0.035f
         val r = Rect(Offset(stroke, stroke), Size(size.width - 2 * stroke, size.height * 2 - 2 * stroke))
         drawArc(p.surface2, 180f, 180f, false, r.topLeft, r.size, style = Stroke(stroke, cap = StrokeCap.Round))
         val col = if (simulated) K.Sim else if (regen) K.Regen else K.Accent
@@ -86,7 +86,7 @@ fun SimBanner() {
 
 @Composable
 fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 3.dp)) {
+    Box(modifier.clip(RoundedCornerShape(50)).border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp)) {
         Text(text.uppercase(), style = labelStyle(10), color = color)
     }
 }
@@ -95,22 +95,23 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
 @Composable
 fun BigButton(text: String, modifier: Modifier = Modifier, selected: Boolean = false, color: Color = K.Accent, enabled: Boolean = true, compact: Boolean = false, onClick: () -> Unit) {
     val p = LocalPalette.current
-    val h = if (LocalGlove.current) 64.dp else 48.dp
+    val h = if (LocalGlove.current) 56.dp else 44.dp
     Box(
-        modifier.heightIn(min = h).clip(RoundedCornerShape(if (compact) 14.dp else 50.dp))
-            .background(if (selected) color else p.surface2)
+        modifier.heightIn(min = h).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) color else Color.Transparent)
+            .border(1.dp, if (selected) color else p.grid, RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, onClick = onClick).padding(horizontal = if (compact) 2.dp else 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text.uppercase(), style = labelStyle(if (compact) 13 else 15).copy(fontWeight = FontWeight.Bold, letterSpacing = if (compact) 0.sp else 1.2.sp), color = if (!enabled) p.textDim else if (selected) (if (color == K.Accent) K.OnAccent else Color.Black) else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+    ) { Text(text.uppercase(), style = labelStyle(if (compact) 11 else 12).copy(letterSpacing = if (compact) 0.6.sp else 1.6.sp), color = if (!enabled) p.textDim else if (selected) (if (color == K.Accent) K.OnAccent else Color.Black) else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
 
 @Composable
-fun SectionTitle(t: String) { Text(t.uppercase(), style = titleStyle(20), color = LocalPalette.current.text, modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)) }
+fun SectionTitle(t: String) { Text(t.uppercase(), style = labelStyle(11), color = LocalPalette.current.textDim, modifier = Modifier.padding(top = 22.dp, bottom = 10.dp)) }
 
 @Composable
 fun Card(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val p = LocalPalette.current
-    Column(modifier.clip(RoundedCornerShape(20.dp)).background(p.surface).padding(16.dp), content = content)
+    Column(modifier.clip(RoundedCornerShape(16.dp)).background(p.surface).border(1.dp, p.grid.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(16.dp), content = content)
 }
 
 /** Simple, fast line chart for telemetry series (multiple series, shared X). */

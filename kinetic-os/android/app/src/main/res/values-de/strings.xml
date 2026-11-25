@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Wegfahrsperre aktiv</string>
     <string name="lock_chip_persist">Bleibt nach Ausschalten</string>
     <string name="lock_enter_pin">PIN eingeben zum Entsperren</string>
+    <string name="nav_back">Zurück</string>
+    <string name="set_home_tiles">Kacheln auf der Startseite</string>
+    <string name="set_tile_images_hint">Tipp: Kachel auf der Startseite lange drücken, um ein eigenes Foto zu setzen.</string>
+    <string name="set_tile_images_reset">Kachelfotos zurücksetzen</string>
+    <string name="set_text_scale">Textgröße</string>
 </resources>

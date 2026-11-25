@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Inmovilizador activo</string>
     <string name="lock_chip_persist">Se mantiene al apagar</string>
     <string name="lock_enter_pin">Introduce el PIN para desbloquear</string>
+    <string name="nav_back">Atrás</string>
+    <string name="set_home_tiles">Mosaicos de la pantalla de inicio</string>
+    <string name="set_tile_images_hint">Consejo: mantén pulsado un mosaico para usar tu propia foto.</string>
+    <string name="set_tile_images_reset">Restablecer fotos de mosaicos</string>
+    <string name="set_text_scale">Tamaño del texto</string>
 </resources>

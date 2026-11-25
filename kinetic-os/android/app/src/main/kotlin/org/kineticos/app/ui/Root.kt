@@ -10,6 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,6 +44,10 @@ fun KineticRoot(activity: MainActivity) {
     val g = activity.graph
     val settings by g.settings.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    // simple back stack: the start screen is the hub, every other screen has a back arrow (and system back)
+    val stack = remember { mutableStateListOf<Screen>() }
+    fun navTo(s: Screen) { if (s == screen) return; if (s == Screen.HOME) stack.clear() else stack.add(screen); screen = s }
+    fun back() { screen = stack.removeLastOrNull() ?: Screen.HOME }
     var dimmed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val markerText = stringResource(R.string.toast_marker)
@@ -48,8 +55,8 @@ fun KineticRoot(activity: MainActivity) {
 
     // Toasts must be shown on the main thread – the emitter may be a background coroutine.
     LaunchedEffect(Unit) { g.toasts.collect { msg -> activity.runOnUiThread { Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show() } } }
-    LaunchedEffect(Unit) { activity.deepLinkJoin.collect { screen = Screen.GROUP } }
-    LaunchedEffect(Unit) { activity.openScreen.collect { n -> Screen.entries.firstOrNull { it.name == n }?.let { screen = it } } }
+    LaunchedEffect(Unit) { activity.deepLinkJoin.collect { navTo(Screen.GROUP) } }
+    LaunchedEffect(Unit) { activity.openScreen.collect { n -> Screen.entries.firstOrNull { it.name == n }?.let { navTo(it) } } }
     // Idle dimming (only while stationary): saves battery on a fixed cockpit phone
     var lastInteraction by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -57,8 +64,8 @@ fun KineticRoot(activity: MainActivity) {
             lastInteraction = System.currentTimeMillis(); dimmed = false
             val order = listOf(Screen.DASH, Screen.MAP, Screen.LIVE, Screen.MODES, Screen.RACE)
             when (a) {
-                KeyAction.NEXT_SCREEN -> screen = order[(order.indexOf(screen).coerceAtLeast(0) + 1) % order.size]
-                KeyAction.PREV_SCREEN -> screen = order[(order.indexOf(screen).coerceAtLeast(0) + order.size - 1) % order.size]
+                KeyAction.NEXT_SCREEN -> navTo(order[(order.indexOf(screen).coerceAtLeast(0) + 1) % order.size])
+                KeyAction.PREV_SCREEN -> navTo(order[(order.indexOf(screen).coerceAtLeast(0) + order.size - 1) % order.size])
                 KeyAction.MODE_UP, KeyAction.MODE_DOWN -> scope.launch {
                     val ps = g.profiles.value; val cur = ps.indexOfFirst { it.id == (g.appliedProfile.value?.id ?: settings.activeProfileId) }.coerceAtLeast(0)
                     val next = ps[(cur + if (a == KeyAction.MODE_UP) 1 else ps.size - 1) % ps.size]
@@ -98,41 +105,20 @@ fun KineticRoot(activity: MainActivity) {
         val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
         val status by g.connection.status.collectAsStateWithLifecycle()
         val simulated = (status as? org.kineticos.app.core.ConnStatus.Online)?.simulated == true
-        val primary = listOf(Screen.HOME, Screen.DASH, Screen.MAP, Screen.MODES)
-        var more by remember { mutableStateOf(false) }
+        androidx.activity.compose.BackHandler(enabled = screen != Screen.HOME) { back() }
+        val density = androidx.compose.ui.platform.LocalDensity.current
         Surface(color = p.bg, modifier = Modifier.fillMaxSize()) {
             // optional user background image, dimmed so the instruments stay readable
             settings.bgImage?.let { bg ->
                 VehiclePhoto(bg, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().background(p.bg.copy(alpha = settings.bgDim.coerceIn(0f, 1f))))
             }
-            Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                if (simulated) SimBanner()
-                if (landscape) Row(Modifier.weight(1f)) {
-                    NavigationRail(containerColor = p.bg.copy(alpha = if (settings.bgImage != null) 0.75f else 1f)) {
-                        primary.forEach { s -> NavigationRailItem(selected = s == screen, onClick = { screen = s; lastInteraction = System.currentTimeMillis() },
-                            icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
-                            colors = NavigationRailItemDefaults.colors(selectedIconColor = K.Accent, selectedTextColor = K.Accent, indicatorColor = Color.Transparent, unselectedIconColor = p.textDim, unselectedTextColor = p.textDim)) }
-                        NavigationRailItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, stringResource(R.string.nav_more)) }, label = { Text(stringResource(R.string.nav_more), style = labelStyle(9)) },
-                            colors = NavigationRailItemDefaults.colors(selectedIconColor = K.Accent, selectedTextColor = K.Accent, indicatorColor = Color.Transparent, unselectedIconColor = p.textDim, unselectedTextColor = p.textDim))
-                    }
-                    Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
-                } else {
-                    Box(Modifier.weight(1f)) { ScreenHost(screen, activity) { screen = it } }
-                    NavigationBar(containerColor = p.bg.copy(alpha = if (settings.bgImage != null) 0.75f else 1f), tonalElevation = 0.dp) {
-                        primary.forEach { s -> NavigationBarItem(selected = s == screen, onClick = { screen = s }, icon = { Icon(s.icon, stringResource(s.label)) }, label = { Text(stringResource(s.label), style = labelStyle(9)) },
-                            colors = navColors()) }
-                        NavigationBarItem(selected = screen !in primary, onClick = { more = true }, icon = { Icon(Icons.Filled.Apps, stringResource(R.string.nav_more)) }, label = { Text(stringResource(R.string.nav_more), style = labelStyle(9)) }, colors = navColors())
-                    }
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, density.fontScale * settings.textScale.coerceIn(0.85f, 1.3f))) {
+                Column(Modifier.fillMaxSize().systemBarsPadding()) {
+                    if (simulated) SimBanner()
+                    Box(Modifier.weight(1f)) { ScreenHost(screen, activity, ::navTo, ::back) }
                 }
             }
-            if (more) AlertDialog(onDismissRequest = { more = false }, confirmButton = {}, containerColor = p.surface, title = { Text(stringResource(R.string.nav_menu)) }, text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Screen.entries.filter { it !in primary }.chunked(2).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { s -> BigButton(stringResource(s.label), Modifier.weight(1f), selected = s == screen) { screen = s; more = false } } }
-                    }
-                }
-            })
             LockedOverlay()
             if (dimmed) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)))
         }
@@ -140,8 +126,38 @@ fun KineticRoot(activity: MainActivity) {
 }
 
 @Composable
-private fun ScreenHost(screen: Screen, activity: MainActivity, go: (Screen) -> Unit) {
+private fun ScreenHost(screen: Screen, activity: MainActivity, go: (Screen) -> Unit, back: () -> Unit) {
     AnimatedContent(screen, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "screen") { s ->
+        // every screen except the hub gets a small back arrow top-left; the cockpit floats it over its status strip
+        val landscape = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
+        if (s != Screen.HOME && s != Screen.DASH) {
+            // landscape: slim gutter with the arrow; portrait: arrow above the content. No bars, no duplicate titles.
+            if (landscape) Row(Modifier.fillMaxSize()) {
+                Box(Modifier.width(60.dp).fillMaxHeight().padding(top = 10.dp), contentAlignment = Alignment.TopCenter) { BackButton(back) }
+                Box(Modifier.weight(1f)) { ScreenBody(s, activity, go) }
+            } else Column(Modifier.fillMaxSize()) {
+                BackButton(back, Modifier.padding(start = 10.dp, top = 8.dp))
+                Box(Modifier.weight(1f)) { ScreenBody(s, activity, go) }
+            }
+        } else Box(Modifier.fillMaxSize()) {
+            ScreenBody(s, activity, go)
+            if (s == Screen.DASH) BackButton(back, Modifier.padding(start = 10.dp, top = 8.dp))
+        }
+    }
+}
+
+/** Small round back arrow (top-left). */
+@Composable
+fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    Box(modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(p.surface2.copy(alpha = 0.85f))
+        .clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.nav_back), tint = p.text, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun ScreenBody(s: Screen, activity: MainActivity, go: (Screen) -> Unit) {
         when (s) {
             Screen.DASH -> DashScreen(go)
             Screen.MAP -> MapScreen()
@@ -158,7 +174,6 @@ private fun ScreenHost(screen: Screen, activity: MainActivity, go: (Screen) -> U
             Screen.STATS -> StatsScreen()
             Screen.SETTINGS -> SettingsScreen()
         }
-    }
 }
 
 /** Compact cockpit for picture-in-picture: speed, power, battery, mode, warnings. */
@@ -189,7 +204,3 @@ fun PipDash() {
     }
 }
 
-@Composable
-private fun navColors(): NavigationBarItemColors { val p = LocalPalette.current
-    return NavigationBarItemDefaults.colors(selectedIconColor = K.Accent, selectedTextColor = K.Accent, indicatorColor = Color.Transparent,
-        unselectedIconColor = p.textDim, unselectedTextColor = p.textDim) }

@@ -596,4 +596,9 @@
     <string name="lock_chip_immobilizer">Immobilizer active</string>
     <string name="lock_chip_persist">Survives power-off</string>
     <string name="lock_enter_pin">Enter PIN to unlock</string>
+    <string name="nav_back">Back</string>
+    <string name="set_home_tiles">Tiles on the start screen</string>
+    <string name="set_tile_images_hint">Tip: long-press a tile on the start screen to use your own photo.</string>
+    <string name="set_tile_images_reset">Reset tile photos</string>
+    <string name="set_text_scale">Text size</string>
 </resources>

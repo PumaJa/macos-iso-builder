@@ -1,6 +1,7 @@
 package org.kineticos.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.combinedClickable
 import org.kineticos.app.R
 import org.kineticos.app.core.ConnStatus
 import org.kineticos.app.graph
@@ -49,7 +52,11 @@ fun HomeScreen(go: (Screen) -> Unit) {
                 is ConnStatus.Connecting, is ConnStatus.Reconnecting -> stringResource(R.string.home_connecting) to K.Warn
                 else -> stringResource(R.string.home_offline) to p.textDim
             }
-            Pill(txt, col)
+            Pill(txt, col, Modifier.clickable { go(Screen.CONNECT) })
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(p.surface2).clickable { go(Screen.SETTINGS) }, contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Settings, stringResource(R.string.nav_settings), tint = p.text, modifier = Modifier.size(22.dp))
+            }
         }
     }
     val hero: @Composable (Modifier) -> Unit = { m ->
@@ -59,7 +66,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f))))
             Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
                 Text((vehicle?.let { listOf(it.manufacturer, it.model).filter { m -> m.isNotBlank() }.joinToString(" · ") } ?: "").uppercase(), style = labelStyle(11), color = Color.White.copy(alpha = 0.6f))
-                Text((vehicle?.name ?: stringResource(R.string.dash_no_vehicle)).uppercase(), style = titleStyle(40), color = Color.White, maxLines = 1)
+                Text(vehicle?.name ?: stringResource(R.string.dash_no_vehicle), style = titleStyle(40), color = Color.White, maxLines = 1)
             }
         }
     }
@@ -74,19 +81,27 @@ fun HomeScreen(go: (Screen) -> Unit) {
             KeyNumber(stringResource(R.string.home_riding_time), "%d:%02d".format(rideMs / 3_600_000, rideMs / 60_000 % 60), p.text, Modifier.weight(1f))
         }
     }
-    val tiles = listOf(
-        Triple(R.string.home_tile_stats, Icons.Filled.BarChart, Screen.STATS), Triple(R.string.home_tile_modes, Icons.Filled.Bolt, Screen.MODES),
-        Triple(R.string.home_tile_trails, Icons.Filled.Terrain, Screen.MAP), Triple(R.string.home_tile_tracks, Icons.Filled.SportsScore, Screen.RACE),
-        Triple(R.string.home_tile_rides, Icons.Filled.History, Screen.RIDES), Triple(R.string.home_tile_group, Icons.Filled.Groups, Screen.GROUP),
-        Triple(R.string.home_tile_setup, Icons.Filled.Build, Screen.SETUP), Triple(R.string.nav_garage, Icons.Filled.Garage, Screen.GARAGE),
-    )
+    val settings by g.settings.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var pickFor by remember { mutableStateOf<String?>(null) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        val key = pickFor; pickFor = null
+        if (uri == null || key == null) return@rememberLauncherForActivityResult
+        scope.launch { org.kineticos.app.data.ImageStore.import(ctx, uri, "tile_$key", 1200)?.let { path -> g.settingsRepo.update { it.copy(tileImages = it.tileImages + (key to path)) } } }
+    }
+    val tiles = settings.homeTiles.mapNotNull { k -> HOME_TILE_CATALOG[k]?.let { k to it } }
     val cockpit: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth().height(84.dp).clip(RoundedCornerShape(20.dp)).background(K.Accent).clickable { go(Screen.DASH) }.padding(horizontal = 20.dp),
+        Row(Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(16.dp)).background(p.surface)
+            .border(1.dp, p.grid, RoundedCornerShape(16.dp)).clickable { go(Screen.DASH) }.padding(start = 20.dp, end = 14.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Speed, null, tint = K.OnAccent, modifier = Modifier.size(34.dp))
-            Spacer(Modifier.width(14.dp))
-            Text(stringResource(R.string.home_tile_cockpit).uppercase(), style = titleStyle(28), color = K.OnAccent, modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = K.OnAccent)
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.home_tile_cockpit), style = titleStyle(24), color = p.text)
+                Text((applied?.name ?: stringResource(R.string.mode_stock)).uppercase(), style = labelStyle(10), color = p.textDim)
+            }
+            Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(K.Accent), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = K.OnAccent, modifier = Modifier.size(20.dp))
+            }
         }
     }
     if (landscape) Row(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -98,7 +113,8 @@ fun HomeScreen(go: (Screen) -> Unit) {
             cockpit(); Spacer(Modifier.height(12.dp))
             tiles.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { (label, icon, target) -> HomeTile(stringResource(label), icon, Modifier.weight(1f), 110) { go(target) } }
+                    row.forEach { (k, t) -> HomeTile(stringResource(t.label), t.icon, settings.tileImages[k], Modifier.weight(1f), 120, { pickFor = k; picker.launch("image/*") }) { go(t.screen) } }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
@@ -107,7 +123,8 @@ fun HomeScreen(go: (Screen) -> Unit) {
         Spacer(Modifier.height(12.dp)); cockpit(); Spacer(Modifier.height(12.dp))
         tiles.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { (label, icon, target) -> HomeTile(stringResource(label), icon, Modifier.weight(1f)) { go(target) } }
+                row.forEach { (k, t) -> HomeTile(stringResource(t.label), t.icon, settings.tileImages[k], Modifier.weight(1f), 150, { pickFor = k; picker.launch("image/*") }) { go(t.screen) } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -118,19 +135,44 @@ fun HomeScreen(go: (Screen) -> Unit) {
 private fun KeyNumber(label: String, value: String, color: Color, modifier: Modifier) {
     val p = LocalPalette.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = numStyle(30, FontWeight.Bold), color = color, maxLines = 1)
+        Text(value, style = numStyle(30), color = color, maxLines = 1)
         Text(label.uppercase(), style = labelStyle(10), color = p.textDim)
     }
 }
 
+data class HomeTileDef(val label: Int, val icon: ImageVector, val screen: Screen)
+
+/** All tiles the user can put on the start screen (Settings → Design). */
+val HOME_TILE_CATALOG: Map<String, HomeTileDef> = linkedMapOf(
+    "STATS" to HomeTileDef(R.string.home_tile_stats, Icons.Filled.BarChart, Screen.STATS),
+    "MODES" to HomeTileDef(R.string.home_tile_modes, Icons.Filled.Bolt, Screen.MODES),
+    "TRAILS" to HomeTileDef(R.string.home_tile_trails, Icons.Filled.Terrain, Screen.MAP),
+    "TRACKS" to HomeTileDef(R.string.home_tile_tracks, Icons.Filled.SportsScore, Screen.RACE),
+    "RIDES" to HomeTileDef(R.string.home_tile_rides, Icons.Filled.History, Screen.RIDES),
+    "GROUP" to HomeTileDef(R.string.home_tile_group, Icons.Filled.Groups, Screen.GROUP),
+    "GARAGE" to HomeTileDef(R.string.nav_garage, Icons.Filled.Garage, Screen.GARAGE),
+    "LIVE" to HomeTileDef(R.string.nav_telemetry, Icons.Filled.MonitorHeart, Screen.LIVE),
+    "REMOTE" to HomeTileDef(R.string.nav_remote, Icons.Filled.Satellite, Screen.REMOTE),
+    "SETUP" to HomeTileDef(R.string.home_tile_setup, Icons.Filled.Build, Screen.SETUP),
+    "CONNECT" to HomeTileDef(R.string.nav_connect, Icons.Filled.Bluetooth, Screen.CONNECT),
+    "SETTINGS" to HomeTileDef(R.string.nav_settings, Icons.Filled.Settings, Screen.SETTINGS),
+)
+
+/** Large tile; own photo if set (long-press = choose photo), otherwise a large faded glyph as artwork. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun HomeTile(label: String, icon: ImageVector, modifier: Modifier, height: Int = 150, onClick: () -> Unit) {
+private fun HomeTile(label: String, icon: ImageVector, image: String?, modifier: Modifier, height: Int, onLongClick: () -> Unit, onClick: () -> Unit) {
     val p = LocalPalette.current
-    Box(modifier.height(height.dp).clip(RoundedCornerShape(20.dp))
-        .background(Brush.linearGradient(listOf(p.surface2, p.surface))).clickable(onClick = onClick)) {
-        // large faded glyph as tile artwork
-        Icon(icon, null, tint = p.text.copy(alpha = 0.07f), modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 24.dp, y = (-10).dp))
-        Icon(icon, null, tint = p.text, modifier = Modifier.padding(16.dp).size(28.dp).align(Alignment.TopStart))
-        Text(label.uppercase(), style = titleStyle(24), color = p.text, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp), maxLines = 1)
+    Box(modifier.height(height.dp).clip(RoundedCornerShape(16.dp))
+        .background(p.surface).border(1.dp, p.grid.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+        .combinedClickable(onLongClick = onLongClick, onClick = onClick)) {
+        if (image != null) {
+            VehiclePhoto(image, Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f))))
+        } else {
+            Icon(icon, null, tint = p.textDim, modifier = Modifier.padding(16.dp).size(22.dp).align(Alignment.TopStart))
+        }
+        Text(label, style = titleStyle(20), color = if (image != null) Color.White else p.text, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp), maxLines = 1)
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = (if (image != null) Color.White else p.textDim).copy(alpha = 0.7f), modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(16.dp))
     }
 }

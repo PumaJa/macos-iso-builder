@@ -76,6 +76,16 @@ fun SettingsScreen() {
             Field(stringResource(R.string.set_brand_name), brandName, { brandName = it.take(24); upd { st -> st.copy(brandName = brandName) } }, Modifier.fillMaxWidth())
         }
         LabeledSlider(stringResource(R.string.set_accent), s.accentLevel, { v -> upd { it.copy(accentLevel = v) } }, 0.4f..1f)
+        LabeledSlider(stringResource(R.string.set_text_scale), s.textScale, { v -> upd { it.copy(textScale = v) } }, 0.85f..1.3f)
+        Text(stringResource(R.string.set_home_tiles), color = p.textDim, style = labelStyle(11), modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            HOME_TILE_CATALOG.forEach { (k, t) -> BigButton(stringResource(t.label), selected = k in s.homeTiles, compact = true) {
+                upd { st -> st.copy(homeTiles = if (k in st.homeTiles) st.homeTiles - k else st.homeTiles + k) } } }
+        }
+        Text(stringResource(R.string.set_tile_images_hint), color = p.textDim, style = labelStyle(10), modifier = Modifier.padding(top = 6.dp))
+        if (s.tileImages.isNotEmpty()) BigButton(stringResource(R.string.set_tile_images_reset), Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            s.tileImages.values.forEach { ImageStore.delete(it) }; upd { it.copy(tileImages = emptyMap()) } }
         Text(stringResource(R.string.set_design_hint), color = p.textDim, style = labelStyle(10))
         SectionTitle(stringResource(R.string.set_display))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { ThemeMode.entries.forEach { m -> BigButton(stringResource(when (m) { ThemeMode.NIGHT -> R.string.theme_night; ThemeMode.DAY -> R.string.theme_day; ThemeMode.SUN -> R.string.theme_sun; ThemeMode.AUTO -> R.string.theme_auto }), Modifier.weight(1f), selected = s.theme == m) { upd { it.copy(theme = m) } } } }

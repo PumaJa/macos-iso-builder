@@ -59,7 +59,14 @@ data class AppSettings(
     val brandName: String = "KINETIC",
     /** Grey level of the accent colour on dark themes (0.5 = mid grey … 1 = white). */
     val accentLevel: Float = 0.95f,
+    /** Start-screen tiles (keys, in order) – user selectable. */
+    val homeTiles: List<String> = DEFAULT_HOME_TILES,
+    /** Own photo per start-screen tile (key → local file path). */
+    val tileImages: Map<String, String> = emptyMap(),
+    /** Text size multiplier for the whole app (0.85 … 1.3). */
+    val textScale: Float = 1f,
 )
+val DEFAULT_HOME_TILES = listOf("STATS", "MODES", "TRAILS", "TRACKS", "RIDES", "GROUP", "GARAGE", "SETTINGS")
 
 class SettingsRepo(private val ctx: Context) {
     private object K {
@@ -75,6 +82,7 @@ class SettingsRepo(private val ctx: Context) {
         val pip = booleanPreferencesKey("pip"); val primary = stringPreferencesKey("primary"); val tiles = stringPreferencesKey("tiles"); val bright = floatPreferencesKey("bright")
         val orient = stringPreferencesKey("orient"); val bg = stringPreferencesKey("bgImage"); val bgDim = floatPreferencesKey("bgDim")
         val logo = stringPreferencesKey("logoImage"); val brand = stringPreferencesKey("brand"); val accent = floatPreferencesKey("accentLevel")
+        val homeTiles = stringPreferencesKey("homeTiles"); val tileImgs = stringPreferencesKey("tileImages"); val textScale = floatPreferencesKey("textScale")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -93,6 +101,9 @@ class SettingsRepo(private val ctx: Context) {
             p[K.bright] ?: d.screenBrightness,
             p[K.orient]?.let { runCatching { ScreenOrientation.valueOf(it) }.getOrNull() } ?: d.orientation,
             p[K.bg], p[K.bgDim] ?: d.bgDim, p[K.logo], p[K.brand] ?: d.brandName, p[K.accent] ?: d.accentLevel,
+            p[K.homeTiles]?.split(',')?.filter { it.isNotBlank() } ?: d.homeTiles,
+            p[K.tileImgs]?.split('|')?.mapNotNull { e -> e.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap() ?: d.tileImages,
+            p[K.textScale] ?: d.textScale,
         )
     }
     suspend fun current() = flow.first()
@@ -109,6 +120,8 @@ class SettingsRepo(private val ctx: Context) {
             put(K.primary, n.primaryValue.name); put(K.tiles, n.dashTiles.take(9).joinToString(",")); put(K.bright, n.screenBrightness)
             put(K.orient, n.orientation.name); put(K.bg, n.bgImage); put(K.bgDim, n.bgDim.coerceIn(0f, 1f)); put(K.logo, n.logoImage)
             put(K.brand, n.brandName.take(24)); put(K.accent, n.accentLevel.coerceIn(0.4f, 1f))
+            put(K.homeTiles, n.homeTiles.joinToString(",")); put(K.tileImgs, n.tileImages.entries.joinToString("|") { "${it.key}=${it.value}" })
+            put(K.textScale, n.textScale.coerceIn(0.85f, 1.3f))
         }
     }
 }

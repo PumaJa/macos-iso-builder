@@ -71,9 +71,10 @@ fun LockedOverlay() {
                     BrandMark(56)
                 }
                 Spacer(Modifier.height(18.dp))
-                Text(stringResource(R.string.lock_screen_title), style = titleStyle(46).copy(letterSpacing = 10.sp), color = Color.White)
+                Text(stringResource(R.string.lock_screen_title), style = titleStyle(46).copy(letterSpacing = 14.sp), color = Color.White)
                 Text((vehicle?.name ?: "").uppercase(), style = labelStyle(12).copy(letterSpacing = 4.sp), color = Color.White.copy(alpha = 0.55f))
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LockChip(stringResource(R.string.lock_chip_immobilizer)); LockChip(stringResource(R.string.lock_chip_persist))
                     if (g.connection.isSimulated) LockChip(stringResource(R.string.sim_short))
                 }
@@ -144,7 +145,7 @@ private fun TamperBanner(modifier: Modifier) {
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "tamper")
     val a by t.animateFloat(1f, 0.25f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(500), androidx.compose.animation.core.RepeatMode.Reverse), label = "a")
     Box(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = a)).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.lock_tamper).uppercase(), style = titleStyle(18), color = Color.Black)
+        Text(stringResource(R.string.lock_tamper).uppercase(), style = labelStyle(12), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 

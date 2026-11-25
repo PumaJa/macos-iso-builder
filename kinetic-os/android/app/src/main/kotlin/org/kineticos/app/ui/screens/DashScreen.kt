@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
@@ -64,8 +65,8 @@ fun DashScreen(go: (Screen) -> Unit) {
     val script by g.connection.scriptStatus.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
-        // status strip
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // status strip (left gap = floating back arrow)
+        Row(Modifier.fillMaxWidth().padding(start = 46.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             val (txt, col) = when (val st = status) {
                 is ConnStatus.Online -> (if (st.simulated) stringResource(R.string.q_sim) else "VESC") to (if (st.simulated) K.Sim else K.Regen)
                 is ConnStatus.Connecting -> stringResource(R.string.dash_st_connecting) to K.Warn
@@ -124,8 +125,8 @@ fun DashScreen(go: (Screen) -> Unit) {
                         Text(mainLabel, style = labelStyle(12), color = p.textDim)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
+                if (showBadge) Spacer(Modifier.height(8.dp))
+                if (showBadge) Row(verticalAlignment = Alignment.Bottom) {
                     if (settings.primaryValue == PrimaryValue.SPEED) {
                         Text(fmt(power, 1, pScale), style = numStyle(40), color = qColor(power.quality, if (pw < 0) K.Regen else K.Accent))
                         Text(" $pUnit  ${stringResource(if (pw < 0) R.string.dash_regen else R.string.dash_power)}", style = labelStyle(12), color = p.textDim)
@@ -241,8 +242,8 @@ fun ModeBadge(applied: org.kineticos.vehicle.RideProfile?, script: org.kineticos
     val name = applied?.name ?: stringResource(R.string.mode_stock)
     val col = if (applied == null) p.textDim else K.Accent
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 6.dp)) {
-        Box(Modifier.clip(RoundedCornerShape(50)).background(col).padding(horizontal = 22.dp, vertical = 2.dp)) {
-            Text(name.uppercase(), style = titleStyle(26), color = if (applied == null) androidx.compose.ui.graphics.Color.Black else K.OnAccent)
+        Box(Modifier.clip(RoundedCornerShape(50)).border(1.dp, col, RoundedCornerShape(50)).padding(horizontal = 20.dp, vertical = 4.dp)) {
+            Text(name.uppercase(), style = labelStyle(16).copy(letterSpacing = 4.sp), color = col)
         }
         applied?.let { Text(stringResource(R.string.mode_regen_char, it.regenFraction * 100, it.character.uiLabel().uppercase()), style = labelStyle(10), color = p.textDim) }
         script?.let { sc ->
