@@ -601,4 +601,5 @@
     <string name="set_tile_images_hint">Tipp: Kachel auf der Startseite lange drücken, um ein eigenes Foto zu setzen.</string>
     <string name="set_tile_images_reset">Kachelfotos zurücksetzen</string>
     <string name="set_text_scale">Textgröße</string>
+    <string name="race_accuracy_note">Bei %1$.0f Hz ist ein Linienübertritt nur auf ±%2$.2f s bekannt; Interpolation verbessert das auf ca. ±%3$.2f s (GPS-Genauigkeit %4$s). Schätzung, keine zertifizierte Zeitmessung.</string>
 </resources>

@@ -86,7 +86,7 @@ open class GalleryTest {
             g.saveVehicle(VehicleProfile("gal", "Kinetic MX 01", VehicleType.E_MOTOCROSS, "Eigenbau", "MX-75", drawnPhoto(), "QS 138 90H", 70.0, 7, 7000.0,
                 8.0, 0.48, 98.0, 30.0, 72.0, 20, "NMC", 15000.0, 300.0, 200.0, 2))
             g.selectVehicle("gal")
-            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0, orientation = org.kineticos.app.data.ScreenOrientation.AUTO) }
+            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0, orientation = org.kineticos.app.data.ScreenOrientation.AUTO, bgImage = null, logoImage = null, brandName = "KINETIC", tileImages = emptyMap()) }
         }
         // 1) ride with the simulated vehicle (incl. emulated vehicle script) so rides/telemetry have data
         g.connectTo("sim-script")

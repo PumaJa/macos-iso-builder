@@ -154,11 +154,23 @@ fun KineticLogo(modifier: Modifier = Modifier, size: Int = 22) {
 
 @Composable
 private fun LogoImage(path: String, modifier: Modifier) {
-    var bmp by remember(path) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(path) {
-        bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
-    }
+    val bmp = remember(path) { LocalImages.get(path, 512) }
     bmp?.let { Image(it, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
+}
+
+/** Small in-memory cache for local photos (vehicle, background, tiles, logo): decoded once, downsampled, instantly available. */
+object LocalImages {
+    private val cache = android.util.LruCache<String, ImageBitmap>(16)
+    fun get(path: String, maxPx: Int = 1600): ImageBitmap? {
+        val key = "$path@$maxPx@" + java.io.File(path).lastModified()
+        cache.get(key)?.let { return it }
+        return runCatching {
+            val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeFile(path, o)
+            var smp = 1; while (maxOf(o.outWidth, o.outHeight) / (smp * 2) >= maxPx) smp *= 2
+            android.graphics.BitmapFactory.decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = smp })?.asImageBitmap()
+        }.getOrNull()?.also { cache.put(key, it) }
+    }
 }
 
 /**
@@ -169,16 +181,6 @@ private fun LogoImage(path: String, modifier: Modifier) {
 fun VehiclePhoto(path: String?, modifier: Modifier = Modifier) {
     if (path == null) return
     if (!path.startsWith("/")) { coil.compose.AsyncImage(path, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop); return }
-    var bmp by remember(path) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(path) {
-        bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching {
-                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                android.graphics.BitmapFactory.decodeFile(path, o)
-                var s = 1; while (o.outWidth / (s * 2) >= 1200) s *= 2
-                android.graphics.BitmapFactory.decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = s })?.asImageBitmap()
-            }.getOrNull()
-        }
-    }
+    val bmp = remember(path) { LocalImages.get(path) }
     bmp?.let { Image(it, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
 }

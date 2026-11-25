@@ -601,4 +601,5 @@
     <string name="set_tile_images_hint">Consejo: mantén pulsado un mosaico para usar tu propia foto.</string>
     <string name="set_tile_images_reset">Restablecer fotos de mosaicos</string>
     <string name="set_text_scale">Tamaño del texto</string>
+    <string name="race_accuracy_note">A %1$.0f Hz un paso solo se conoce con ±%2$.2f s; la interpolación lo mejora a aprox. ±%3$.2f s (precisión GPS %4$s). Estimación, no cronometraje certificado.</string>
 </resources>

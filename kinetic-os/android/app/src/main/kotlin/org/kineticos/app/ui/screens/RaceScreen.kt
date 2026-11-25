@@ -56,7 +56,11 @@ fun RaceScreen() {
         SectionTitle(stringResource(R.string.race_title))
         Card(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.race_gps, hz, fix?.accuracyM?.let { "%.0f".format(it) } ?: "?"), color = p.text)
-            Text(LapTimer.accuracyNote(hz.coerceAtLeast(0.1), fix?.accuracyM), color = p.textDim, style = labelStyle(10))
+            run {
+                val gHz = hz.coerceAtLeast(0.1)
+                val est = LapTimer.estimateUncertaintyS(gHz, fix?.accuracyM, 15.0)
+                Text(stringResource(R.string.race_accuracy_note, gHz, 0.5 / gHz, est, fix?.accuracyM?.let { "%.1f m".format(it) } ?: "—"), color = p.textDim, style = labelStyle(10))
+            }
         }
         timer?.let { t ->
             Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {

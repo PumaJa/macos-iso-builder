@@ -601,4 +601,5 @@
     <string name="set_tile_images_hint">Suggerimento: tieni premuto un riquadro per usare una tua foto.</string>
     <string name="set_tile_images_reset">Ripristina foto dei riquadri</string>
     <string name="set_text_scale">Dimensione testo</string>
+    <string name="race_accuracy_note">A %1$.0f Hz un passaggio è noto solo a ±%2$.2f s; l’interpolazione lo migliora a circa ±%3$.2f s (precisione GPS %4$s). Stima, cronometraggio non certificato.</string>
 </resources>

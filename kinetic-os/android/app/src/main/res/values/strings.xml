@@ -601,4 +601,5 @@
     <string name="set_tile_images_hint">Tip: long-press a tile on the start screen to use your own photo.</string>
     <string name="set_tile_images_reset">Reset tile photos</string>
     <string name="set_text_scale">Text size</string>
+    <string name="race_accuracy_note">At %1$.0f Hz a crossing is only known to ±%2$.2f s; interpolation improves this to about ±%3$.2f s (GPS accuracy %4$s). Estimate, not certified timing.</string>
 </resources>

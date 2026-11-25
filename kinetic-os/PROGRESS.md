@@ -28,3 +28,4 @@
 | 2026-11-25 | Stark feature set from user images: home, stats (airtime/g-force), M1–M5 with PS/kW, riding time, neutral, parental lock, brightness, FR/IT/ES/SV (subagent), VargLink invite links | all green (see TEST_RESULTS) |
 | 2026-11-25 | Redesign (greyscale, Barlow Condensed, own K mark), landscape layouts, personalisation (background, logo, name, accent), new lock screen with PIN pad | see TEST_RESULTS |
 | 2026-11-25 | Premium pass: Barlow light numerals, hairlines; no nav bars (hub + back arrow); home tiles selectable with own photos; text size | all green |
+| 2026-11-25 | Final polish: cached photo loading (hero always shows), localised race accuracy note, gallery state reset | all green |
