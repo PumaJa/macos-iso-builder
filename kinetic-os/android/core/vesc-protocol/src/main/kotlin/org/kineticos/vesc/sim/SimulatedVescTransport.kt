@@ -48,10 +48,21 @@ class SimulatedVescTransport(
     private val sModes = arrayOf(SMode(0.4, 6000.0, 30000.0), SMode(0.7, 10500.0, 50000.0), SMode(1.0, 15000.0, 50000.0), SMode(0.5, 7500.0, 50000.0), SMode(0.5, 7500.0, 50000.0))
     var scriptMode = 1; private set
     private var lastReject = 0
+    // emulated immobilizer (RAM only in the simulator; the real script persists it in EEPROM)
+    var locked = false; private set
+    private var pin: Long? = null
+    private var fails = 0; private var lockoutUntil = 0L; private var lockoutS = 60L
+    var tamper = false; private set
+    private var pushedSince = 0L
+    /** Test hook: someone pushes the parked vehicle (wheel turns while locked). */
+    var externalErpm = 0.0
     private fun scriptReply(ver: Int, cmd: Int, res: Int): ByteArray {
         val w = VescWriter(18).u8(CommPacketId.CUSTOM_APP_DATA.id).u8(0x4B).u8(ver).u8(cmd).u8(res).u8(scriptMode)
             .i16((maxScale / ceilScale * 1000).toInt()).u8(0).u8(lastReject).u8(tempFet.toInt()).u8(tempMotor.toInt())
             .i16((voltage() * 10).toInt()).i32(erpm.toInt())
+        val lockedOut = clock() < lockoutUntil
+        w.u8((if (locked) 1 else 0) or (if (pin != null) 2 else 0) or (if (tamper) 4 else 0) or (if (lockedOut) 8 else 0))
+        w.u8(if (lockedOut) ((lockoutUntil - clock()) / 1000).toInt().coerceIn(0, 255) else 0)
         return w.toByteArray()
     }
     private fun applyMode(m: SMode) { maxScale = m.scale.coerceAtMost(ceilScale); wattMax = m.watt.coerceAtMost(ceilWatt); maxErpm = m.erpm.coerceAtMost(ceilErpm) }
@@ -62,13 +73,21 @@ class SimulatedVescTransport(
         val moving = abs(erpm) >= 300
         val res = when (cmd) {
             3 -> 0
-            1 -> { if (d.size < 4) 4 else { val i = r.u8(); val cur = sModes[scriptMode]
+            1 -> if (locked) 11 else if (d.size < 4) 4 else { val i = r.u8(); val cur = sModes[scriptMode]
                     when { i > 4 -> 2; moving && (sModes[i].scale > cur.scale || sModes[i].watt > cur.watt || sModes[i].erpm > cur.erpm) -> 3
-                        else -> { scriptMode = i; applyMode(sModes[i]); 0 } } } }
+                        else -> { scriptMode = i; applyMode(sModes[i]); 0 } } }
             2 -> { val need = if (ver == 2) 16 else 14
-                if (d.size < need) 4 else { val slot = r.u8(); val sc = r.u16() / 1000.0; val wt = if (ver == 2) r.u32().toDouble() else r.u16().toDouble()
+                if (locked) 11 else if (d.size < need) 4 else { val slot = r.u8(); val sc = r.u16() / 1000.0; val wt = if (ver == 2) r.u32().toDouble() else r.u16().toDouble()
                     r.u16(); val er = r.u32().toDouble()
                     if (slot != 3 && slot != 4) 6 else { sModes[slot] = SMode(sc.coerceAtMost(ceilScale), wt.coerceAtMost(ceilWatt), er.coerceAtMost(ceilErpm)); 0 } } }
+            4 -> if (d.size < 7) 4 else { val p = r.u32()
+                when { pin == null -> 8; p != pin -> 7; moving -> 3; else -> { locked = true; maxScale = 0.0; 0 } } }
+            5 -> if (d.size < 7) 4 else { val p = r.u32()
+                when { clock() < lockoutUntil -> 9
+                    p != pin -> { fails++; if (fails >= 5) { lockoutUntil = clock() + lockoutS * 1000; lockoutS = (lockoutS * 2).coerceAtMost(3600); fails = 0 }; 7 }
+                    else -> { locked = false; tamper = false; fails = 0; lockoutS = 60; applyMode(sModes[scriptMode]); 0 } } }
+            6 -> if (d.size < 11) 4 else { val old = r.u32(); val new = r.u32()
+                when { locked -> 11; pin != null && old != pin -> 7; new !in 1000L..99_999_999L -> 10; else -> { pin = new; 0 } } }
             else -> 5
         }
         lastReject = if (res == 0) 0 else res
@@ -81,9 +100,13 @@ class SimulatedVescTransport(
     fun step() {
         val now = clock(); val dt = ((now - lastStep).coerceIn(0, 1000)) / 1000.0; lastStep = now
         val time = (now - t0) / 1000.0
-        throttle = manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
+        throttle = if (locked) 0.0 else manualThrottle ?: ((0.5 + 0.5 * sin(time / 6.0)).coerceIn(0.0, 1.0) * 0.8)
         val target = throttle * maxScale * maxErpm * 0.8
         erpm += (target - erpm) * min(1.0, dt * 0.8)
+        if (locked) {
+            erpm = if (externalErpm != 0.0) externalErpm else erpm * 0.5  // no drive torque; wheel only turns when pushed
+            if (abs(erpm) >= 300) { if (pushedSince == 0L) pushedSince = now; if (now - pushedSince > 1000) tamper = true } else pushedSince = 0L
+        }
         val power = motorCurrent() * voltage()
         if (power >= 0) wh += power * dt / 3600 else whRegen += -power * dt / 3600
         ah += inputCurrent() * dt / 3600

@@ -55,6 +55,7 @@ object AlertNotifier {
             "low_battery" -> "$vehicleName: battery low"
             "fault" -> "$vehicleName: controller fault"
             "maintenance" -> "$vehicleName: maintenance due"
+            "theft" -> "🚨 $vehicleName is being moved while LOCKED"
             else -> "$vehicleName: ${a.kind}"
         }
         val pi = PendingIntent.getActivity(ctx, 0, Intent(ctx, MainActivity::class.java).putExtra("screen", "REMOTE"), PendingIntent.FLAG_IMMUTABLE)

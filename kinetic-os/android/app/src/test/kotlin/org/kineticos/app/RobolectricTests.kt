@@ -153,4 +153,34 @@ class UiSimulationTest {
         shot("vesc_setup_check")
         g.disconnect()
     }
+
+    @Test fun antiTheftLockEndToEndWithSimulatedVehicleScript() {
+        val g = ctx.graph
+        g.startRuntime()
+        runBlocking { g.saveVehicle(VehicleProfile("veh3", "Lock MX", motorPolePairs = 7, gearRatio = 8.0, wheelDiameterM = 0.48)); g.selectVehicle("veh3") }
+        g.connectTo("sim-script-parked")
+        waitFor { g.connection.scriptStatus.value?.lock != null && g.connection.backup.value != null && g.connection.sample.value?.speedMps?.isAvailable == true }
+        val sim = g.connection.transport as org.kineticos.vesc.sim.SimulatedVescTransport
+        assertTrue(runBlocking { g.lockAction("lock", "1234") }.contains("Set a PIN first"))
+        assertEquals("PIN saved on the vehicle", runBlocking { g.lockAction("setpin", "", "1234") })
+        assertTrue(runBlocking { g.lockAction("lock", "9999") }.contains("wrong PIN"))
+        assertEquals("Vehicle LOCKED", runBlocking { g.lockAction("lock", "1234") })
+        assertTrue(sim.locked)
+        // locked: ride modes are refused by the vehicle, output stays disabled
+        assertTrue(runBlocking { g.applyProfile(RideProfile.RACE) }.contains("locked"), "mode while locked")
+        compose.setContent { KineticTheme(ThemeMode.NIGHT, true) { androidx.compose.foundation.layout.Box { DashScreen {}; LockedOverlay() } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("VEHICLE LOCKED").fetchSemanticsNodes().isNotEmpty() }
+        // someone pushes the bike → tamper flag → warning
+        sim.externalErpm = 2000.0
+        waitFor(30_000) { g.connection.scriptStatus.value?.lock?.tamper == true }
+        waitFor { g.warnings.history.value.any { it.key == "theft" } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("MOVEMENT DETECTED", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        shot("lock_overlay_tamper")
+        sim.externalErpm = 0.0
+        // 5 wrong PINs → lockout
+        repeat(5) { runBlocking { g.lockAction("unlock", "0000".replace("0", "1")) } }
+        assertTrue(runBlocking { g.lockAction("unlock", "1234") }.contains("wait"), "lockout")
+        assertTrue(sim.locked)
+        g.disconnect()
+    }
 }

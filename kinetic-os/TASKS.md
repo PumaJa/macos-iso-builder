@@ -16,7 +16,8 @@
 - [x] VESC setup check + drivetrain import, kinetic.vescpkg
 
 ## Open
-- [ ] Phone-independent lock (LispBM): idea – script holds `app-disable-output` while a lock flag set via protocol cmd is active; needs hardware validation of failure modes (e.g. lock while moving must be refused)
+- [x] Anti-theft lock: LispBM (EEPROM, app-disable-output, tamper, lockout), app UI, gate rules, server theft alert
+- [ ] Validate the lock on a real VESC (see docs/HARDWARE.md step 11)
 - [ ] Hardware validation (docs/HARDWARE.md checklist) – needs a real VESC vehicle
 - [x] LispBM: validated in real LispBM interpreter (141 assertions), protocol v2 (u32 watts)
 - [ ] LispBM: run on real VESC, verify `conf-set` names on FW 6.06/7.00; add throttle-curve/engine-brake control (needs validation)

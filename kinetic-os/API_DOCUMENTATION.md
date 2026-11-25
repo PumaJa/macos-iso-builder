@@ -54,9 +54,9 @@ Only members can read a private group. Codes are random, unique, case-insensitiv
 | GET | /telematics/:vehicleId/alerts?since | – | `[alert]` |
 | PUT | /telematics/:vehicleId/settings | `{lowBatteryPct, maintenanceKm, moveAlert:boolean}` | settings |
 
-`vehicleState = {ts, lat?, lon?, alt?, speedKmh?, headingDeg?, socPct?, voltage?, powerW?, tempMosC?, tempMotorC?, odometerKm?, faultCode?, vescConnected:boolean, charging?:boolean, source:"measured"|"simulated"}`
+`vehicleState = {ts, lat?, lon?, alt?, speedKmh?, headingDeg?, socPct?, voltage?, powerW?, tempMosC?, tempMotorC?, odometerKm?, faultCode?, vescConnected:boolean, charging?:boolean, locked?:boolean, tamper?:boolean, source:"measured"|"simulated"}`
 `online` = last state received < 60 s ago **and** `vescConnected`. Simulated states are stored but flagged.
-`alert = {id, ts, kind:"geofence_exit"|"geofence_enter"|"low_battery"|"fault"|"movement"|"maintenance", message, state}`
+`alert = {id, ts, kind:"geofence_exit"|"geofence_enter"|"low_battery"|"fault"|"movement"|"maintenance"|"theft", message, state}` – `theft` fires once when a locked vehicle reports `tamper:true`; a locked vehicle is also watched for GPS movement.
 
 ## Rides
 | POST | /rides | `{id, vehicleId, startedAt, endedAt, distanceM, maxSpeedKmh, energyWh, gpx?, summary?}` | `201` |

@@ -101,6 +101,7 @@ class AppGraph(val ctx: Context) {
         when {
             spec == "sim" -> factory = { SimulatedVescTransport() }
             spec == "sim-script" -> factory = { SimulatedVescTransport(scriptInstalled = true) }
+            spec == "sim-script-parked" -> factory = { SimulatedVescTransport(scriptInstalled = true).apply { manualThrottle = 0.0 } }
             spec.startsWith("ble:") -> { val addr = spec.removePrefix("ble:"); factory = { BleVescTransport(ctx, addr) } }
             spec.startsWith("tcp:") -> {
                 val parts = spec.removePrefix("tcp:").split(":"); val h = parts[0]; val port = parts.getOrNull(1)?.toIntOrNull() ?: 65102
@@ -190,6 +191,22 @@ class AppGraph(val ctx: Context) {
             } catch (e: Exception) { "Write failed – vehicle keeps previous mode (${e.message})" }
         }
 
+    // ---------- anti-theft lock (lives on the VESC script; the phone only sends PIN-protected commands) ----------
+    suspend fun lockAction(action: String, pin: String, newPin: String? = null): String {
+        val c = connection.client ?: return "Not connected"
+        val s = connection.sample.value
+        val live = LiveState(connection.lastValues.value?.erpm, s?.speedMps?.value?.times(3.6), s?.faultCode ?: 0, connection.linkHealthy.value, null, null, null)
+        return when (val d = gate.planLock(action, pin, newPin, connection.scriptStatus.value, live)) {
+            is LockDecision.Denied -> d.reason
+            is LockDecision.Allowed -> try {
+                val st = OnVehicleScript.parseStatus(c.writeAckedChecked(d.payload, d.token)) ?: return "No reply from vehicle script"
+                connection.updateScript(st)
+                if (st.result != 0) "Refused by vehicle: ${st.resultText}"
+                else when (action) { "lock" -> "Vehicle LOCKED"; "unlock" -> "Vehicle unlocked"; else -> "PIN saved on the vehicle" }
+            } catch (e: Exception) { "No confirmation from vehicle (${e.message}) – check lock state before leaving" }
+        }
+    }
+
     suspend fun restoreStock(): String {
         val c = connection.client ?: return "Not connected"
         val b = connection.backup.value ?: return "No backup available"
@@ -234,7 +251,7 @@ class AppGraph(val ctx: Context) {
             val online = connection.status.value is ConnStatus.Online
             val sample = connection.sample.value
             pending += TelematicsMapper.toState(if (online) sample else null, online && connection.linkHealthy.value,
-                sample?.odometerKm?.value, connection.isSimulated, gps.fix.value)
+                sample?.odometerKm?.value, connection.isSimulated, gps.fix.value, connection.scriptStatus.value?.lock)
             if (pending.size > 500) pending.subList(0, pending.size - 500).clear()
             runCatching { api.pushStates(v.id, pending.toList()); pending.clear() }   // offline → kept and retried
         }

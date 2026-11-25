@@ -23,6 +23,7 @@ import org.kineticos.app.KeyAction
 import org.kineticos.app.MainActivity
 import org.kineticos.app.graph
 import org.kineticos.app.ui.screens.*
+import org.kineticos.app.ui.screens.LockedOverlay
 
 enum class Screen(val label: String, val icon: ImageVector) {
     DASH("Dash", Icons.Filled.Speed), MAP("Map", Icons.Filled.Map), MODES("Modes", Icons.Filled.Tune),
@@ -110,6 +111,7 @@ fun KineticRoot(activity: MainActivity) {
                     })
                 }
             }
+            LockedOverlay()
             if (dimmed) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)))
         }
     }

@@ -73,6 +73,7 @@ fun DashScreen(go: (Screen) -> Unit) {
             Pill(if (gpsFix != null) "GPS ±%.0fm".format(gpsFix!!.accuracyM ?: 0.0) else "NO GPS", if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
             if (rec != null) Pill("● REC", K.Danger)
             Spacer(Modifier.weight(1f))
+            LockPill()
             Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(22), color = p.text)
         }
         if (status !is ConnStatus.Online) {

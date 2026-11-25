@@ -13,8 +13,8 @@ android {
         applicationId = "org.kineticos.app"
         minSdk = 26          // Android 8.0 – covers older Samsung devices; BLE + foreground services available
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

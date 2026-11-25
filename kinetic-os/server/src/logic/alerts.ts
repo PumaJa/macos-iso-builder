@@ -1,4 +1,4 @@
-export type AlertKind = 'geofence_exit' | 'geofence_enter' | 'low_battery' | 'fault' | 'movement' | 'maintenance';
+export type AlertKind = 'geofence_exit' | 'geofence_enter' | 'low_battery' | 'fault' | 'movement' | 'maintenance' | 'theft';
 export interface AlertDraft {
   ts: number;
   kind: AlertKind;
@@ -12,6 +12,8 @@ export interface StateLike {
   odometerKm?: number;
   faultCode?: number;
   vescConnected: boolean;
+  locked?: boolean;
+  tamper?: boolean;
   source: 'measured' | 'simulated';
 }
 export interface AlertSettings {
@@ -28,6 +30,8 @@ export interface Tracking {
   lastMaintKm: number | null;
   /** previous inside/outside per geofence id; missing/null = unknown */
   fenceInside: Record<string, boolean | null>;
+  /** tamper alert already raised for the current lock period */
+  tamperActive?: boolean;
 }
 export interface FenceCheck {
   id: string;
@@ -130,9 +134,19 @@ export function evaluateState(
     }
   }
 
-  // movement while parked / VESC disconnected
+  // anti-theft lock: the controller reports wheel movement while locked
+  if (state.tamper && state.locked) {
+    if (!t.tamperActive) {
+      t.tamperActive = true;
+      push('theft', 'THEFT ALERT: vehicle is being moved while locked');
+    }
+  } else if (!state.locked) {
+    t.tamperActive = false;
+  }
+
+  // movement while parked / locked / VESC disconnected
   if (state.lat !== undefined && state.lon !== undefined) {
-    if (!state.vescConnected || settings.parked) {
+    if (!state.vescConnected || settings.parked || state.locked) {
       if (!t.anchor) {
         t.anchor = { lat: state.lat, lon: state.lon };
       } else {

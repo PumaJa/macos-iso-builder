@@ -90,3 +90,24 @@ describe('evaluateState', () => {
     expect(haversineM(48, 11, 48.001, 11)).toBeLessThan(112);
   });
 });
+
+describe('anti-theft lock alerts', () => {
+  const settings = { lowBatteryPct: 20, maintenanceKm: 0, moveAlert: true, parked: false };
+  const base = { lowBatteryActive: false, lastFault: null, anchor: null, lastMaintKm: null, fenceInside: {} };
+  it('raises one theft alert per tamper event and re-arms after unlock', () => {
+    let r = evaluateState({ ts: 1, vescConnected: true, locked: true, tamper: false, source: 'measured' }, settings, base, []);
+    expect(r.alerts).toHaveLength(0);
+    r = evaluateState({ ts: 2, vescConnected: true, locked: true, tamper: true, source: 'measured' }, settings, r.tracking, []);
+    expect(r.alerts.map((a) => a.kind)).toEqual(['theft']);
+    r = evaluateState({ ts: 3, vescConnected: true, locked: true, tamper: true, source: 'measured' }, settings, r.tracking, []);
+    expect(r.alerts).toHaveLength(0);
+    r = evaluateState({ ts: 4, vescConnected: true, locked: false, source: 'measured' }, settings, r.tracking, []);
+    r = evaluateState({ ts: 5, vescConnected: true, locked: true, tamper: true, source: 'simulated' }, settings, r.tracking, []);
+    expect(r.alerts[0].message).toBe('[SIMULATION] THEFT ALERT: vehicle is being moved while locked');
+  });
+  it('watches GPS movement while locked even with the VESC connected', () => {
+    let r = evaluateState({ ts: 1, lat: 47, lon: 8, vescConnected: true, locked: true, source: 'measured' }, settings, base, []);
+    r = evaluateState({ ts: 2, lat: 47.001, lon: 8, vescConnected: true, locked: true, source: 'measured' }, settings, r.tracking, []);
+    expect(r.alerts.map((a) => a.kind)).toContain('movement');
+  });
+});

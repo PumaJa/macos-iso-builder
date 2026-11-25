@@ -4,7 +4,8 @@ import org.kineticos.telemetry.TelemetrySample
 
 object TelematicsMapper {
     /** Maps a cockpit sample to the server's vehicleState. Values are passed through only if available – never invented. */
-    fun toState(s: TelemetrySample?, vescConnected: Boolean, odometerKm: Double?, simulated: Boolean, fallbackGps: org.kineticos.telemetry.GpsFix? = null): VehicleState {
+    fun toState(s: TelemetrySample?, vescConnected: Boolean, odometerKm: Double?, simulated: Boolean, fallbackGps: org.kineticos.telemetry.GpsFix? = null,
+                lock: org.kineticos.vehicle.LockState? = null): VehicleState {
         val g = s?.gps ?: fallbackGps
         return VehicleState(
             ts = System.currentTimeMillis(), lat = g?.lat, lon = g?.lon, alt = g?.altM,
@@ -12,6 +13,7 @@ object TelematicsMapper {
             powerW = s?.batteryPowerW?.value, tempMosC = s?.tempMosC?.value, tempMotorC = s?.tempMotorC?.value, odometerKm = odometerKm,
             faultCode = s?.faultCode, vescConnected = vescConnected, charging = s?.batteryCurrentA?.value?.let { it < -0.5 && (s.speedMps.value ?: 0.0) < 0.3 },
             source = if (simulated) "simulated" else "measured",
+            locked = lock?.locked, tamper = lock?.tamper,
         )
     }
 }

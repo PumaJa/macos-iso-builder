@@ -153,6 +153,7 @@
     sBox.appendChild(stat('Motor temp', fmt(st.tempMotorC, 0, ' °C'), st.tempMotorC > 90 ? 'warn' : ''));
     sBox.appendChild(stat('Odometer', fmt(st.odometerKm, 1, ' km')));
     sBox.appendChild(stat('Fault', st.faultCode ? String(st.faultCode) : 'none', st.faultCode ? 'bad' : ''));
+    if (st.locked !== undefined && st.locked !== null) sBox.appendChild(stat('Lock', st.locked ? (st.tamper ? 'LOCKED – MOVED!' : 'LOCKED') : 'unlocked', st.tamper ? 'bad' : (st.locked ? 'ok' : '')));
     $('lastseen').textContent = 'Last seen: ' + fmtTime(l.receivedAt) + ' · sample time ' + fmtTime(st.ts) + ' · source: ' + st.source + (st.charging ? ' · charging' : '');
     var m = getMap('map');
     if (st.lat != null) {
@@ -196,7 +197,7 @@
     }).catch(function (e) { toast(e.message); });
   }
   function alertItem(a) {
-    return h('li', null, h('div', null, h('div', { class: 'alert-kind' }, a.kind.replace('_', ' ') + (a.state && a.state.source === 'simulated' ? ' · SIMULATION' : '')), h('div', null, a.message)), h('span', { class: 'muted small' }, fmtTime(a.ts)));
+    return h('li', null, h('div', null, h('div', { class: 'alert-kind' + (a.kind === 'theft' ? ' bad' : '') }, a.kind.replace('_', ' ') + (a.state && a.state.source === 'simulated' ? ' · SIMULATION' : '')), h('div', null, a.message)), h('span', { class: 'muted small' }, fmtTime(a.ts)));
   }
 
   // ---- rides ----

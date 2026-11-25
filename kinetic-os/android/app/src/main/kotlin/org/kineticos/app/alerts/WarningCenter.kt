@@ -46,6 +46,12 @@ class WarningCenter(private val ctx: Context, private val scope: CoroutineScope,
                 }
             }
         }
+        // anti-theft: tamper flag from the vehicle script (rising edge) → critical warning
+        scope.launch {
+            conn.scriptStatus.map { it?.lock?.let { l -> l.locked && l.tamper } ?: false }.distinctUntilChanged().collect { t ->
+                if (t) emit(RideWarning(System.currentTimeMillis(), WarnLevel.CRITICAL, "theft", "Vehicle is being moved while locked", conn.isSimulated))
+            }
+        }
     }
 
     fun clearHistory() { _history.value = emptyList() }

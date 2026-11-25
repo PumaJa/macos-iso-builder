@@ -19,6 +19,7 @@
 12. **Emulator:** this build machine has no KVM; the emulator ran with software CPU emulation (very slow, SystemUI ANRs). Map tiles could not be loaded there because of the sandbox's TLS proxy – map rendering is unverified until tested on a device.
 13. **Auth token** is AES-GCM encrypted with an Android Keystore key; falls back to app-private plaintext only if the Keystore is unusable.
 14. The APK is large (~63 MB debug) because MapLibre ships native libraries for 4 ABIs; use ABI splits for distribution.
+18. **Anti-theft lock** is a deterrent, not a certified immobilizer (see SECURITY.md). Lock/unlock is only possible from the cockpit phone (BLE); the second phone receives theft alerts but cannot lock remotely (deliberately no remote control path).
 16. **kinetic.vescpkg** was built with VESC Tool 7.01 (compiled here with small Qt 6.4 compatibility patches) and verified structurally; it has not been loaded in an official VESC Tool or on a VESC.
 17. PiP mini cockpit, voice warnings and dash tile selection were render-tested on the JVM only; check on a real phone.
 15. LispBM: validated in the LispBM interpreter (lispBM 0.41, newer than some firmware builds) – not yet on a VESC. Re-uploading the script without a VESC power cycle makes already-reduced limits the new ceiling (documented).

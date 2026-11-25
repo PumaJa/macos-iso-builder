@@ -13,6 +13,16 @@
 | Link loss | Limits stay as last applied (≤ stock). The LispBM script keeps derating locally without the phone. |
 | Simulated data | Never mixed into real rides; flagged `source:"simulated"` in telematics; magenta UI. |
 
+## Anti-theft lock (immobilizer)
+* Runs in `kinetic.lisp` on the VESC: works without the phone, persists in EEPROM across power cycles.
+* Engages **only at standstill** (checked by the app's SafetyGate *and* by the script); never applies brake current.
+* While locked: throttle apps disabled (`app-disable-output`), motor current scale 0, ride-mode commands refused,
+  wheel movement > 1 s sets a tamper flag → spoken/critical warning on the cockpit and `theft` alert on the server.
+* Unlock needs the PIN (4–8 digits); 5 wrong PINs → 60 s lockout, doubling up to 1 h.
+* **Limits (honest):** this is a deterrent. The PIN is stored on the controller (obfuscated, not encrypted); anyone with
+  VESC Tool access to the controller (USB, or BLE without a BLE PIN) can stop the script and clear the lock. Set a
+  VESC BLE pin and keep the controller physically inaccessible. Recovery when the PIN is lost: lispbm/README.md.
+
 ## App security
 * HTTPS enforced by `network_security_config` (cleartext only for localhost/emulator/`.local`/`.lan`/`home.arpa` during NAS setup).
 * JWT encrypted with AES-256-GCM using a non-exportable Android Keystore key (`TokenCipher`), stored in app-private DataStore.

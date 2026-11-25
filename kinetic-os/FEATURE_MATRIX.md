@@ -128,7 +128,7 @@ erforderlich · **NS** = Nicht unterstützt.
 | VESC-Einrichtungscheck (nur lesend) + Antriebsdaten-Import | IT |
 | Fahrmodi über das Fahrzeugskript (keine Konkurrenz App ↔ Skript) | IT (Simulator-E2E) / IH |
 | VESC-Paket `kinetic.vescpkg` (mit VESC Tool 7.01 gebaut) | TI – gebaut und strukturell geprüft, nicht in VESC Tool geladen |
-| Diebstahlsperre ohne Handy | HW (Hardwarevalidierung nötig) |
+| Diebstahlsperre (Wegfahrsperre im VESC-Skript, PIN, übersteht Neustart, nur im Stand, Schiebe-/Abschlepp-Erkennung → Alarm am Zweithandy) | IT (Simulator-E2E, Server, LispBM-Interpreter) / IH |
 
 ## Was NICHT nachgebildet wird
 Originale Stark-Grafiken, Logos, Schriften, Fahrzeugdarstellung, Menütexte oder Quellcode (urheber-/markenrechtlich geschützt,

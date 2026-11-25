@@ -34,6 +34,12 @@ that stored configuration and are applied in RAM only. ECO/SPORT/RACE/CRAWL are 
 Power increases are accepted only at standstill. *Restore stock* or a VESC power-cycle returns to the stored configuration.
 Optional on-vehicle derating: upload `lispbm/kinetic.lisp` (see `lispbm/README.md`).
 
+## 4b. Anti-theft lock
+Requires the vehicle script (`kinetic.vescpkg`, VESC Tool → VESC Packages). Dash → 🔓 LOCK → CHANGE PIN (first time) →
+LOCK (only at standstill). The lock stays active without the phone and after switching the vehicle off. Unlock on the
+dash with the PIN. Moving the locked vehicle triggers a warning on the cockpit and a theft alert on the second phone /
+web dashboard. Lost PIN → recovery with VESC Tool (lispbm/README.md).
+
 ## 5. Fixed cockpit phone
 * Settings → Start on boot, Keep screen on, Kiosk, Glove mode, Dim when idle.
 * Full kiosk (no system UI escape) needs device-owner provisioning on a freshly reset phone (no Google account added yet):

@@ -26,6 +26,7 @@ class ApiException(val code: Int, val error: String, message: String) : Exceptio
     val headingDeg: Double? = null, val socPct: Double? = null, val voltage: Double? = null, val powerW: Double? = null,
     val tempMosC: Double? = null, val tempMotorC: Double? = null, val odometerKm: Double? = null, val faultCode: Int? = null,
     val vescConnected: Boolean, val charging: Boolean? = null, val source: String,
+    val locked: Boolean? = null, val tamper: Boolean? = null,
 )
 @Serializable data class Alert(val id: String, val ts: Long, val kind: String, val message: String)
 @Serializable data class Geofence(val id: String, val name: String, val lat: Double, val lon: Double, val radiusM: Double, val alertOn: String)

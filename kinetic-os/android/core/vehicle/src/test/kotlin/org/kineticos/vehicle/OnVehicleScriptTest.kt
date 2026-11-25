@@ -36,3 +36,38 @@ class OnVehicleScriptTest {
         assertIs<ScriptDecision.Denied>(moving)
     }
 }
+
+class LockProtocolTest {
+    private val gate = SafetyGate(clock = { 0 })
+    private val still = LiveState(0.0, 0.0, 0, true, null, null, null)
+    private fun status(lock: LockState?) = ScriptStatus(2, 3, 0, 1, 1.0, false, false, false, 0, 30, 30, 80.0, 0, lock)
+
+    @Test fun bytesMatchProtocol() {
+        assertEquals("4b02040000162e", OnVehicleScript.lock("5678").joinToString("") { "%02x".format(it) })
+        assertEquals("4b02050000162e", OnVehicleScript.unlock("5678").joinToString("") { "%02x".format(it) })
+        assertEquals("4b020600000000000004d2", OnVehicleScript.setPin(null, "1234").joinToString("") { "%02x".format(it) })
+        assertFalse(OnVehicleScript.validPin("123")); assertFalse(OnVehicleScript.validPin("0999")); assertFalse(OnVehicleScript.validPin("12a4")); assertTrue(OnVehicleScript.validPin("00001234".trimStart('0')))
+    }
+
+    @Test fun parsesLockBytesAndStaysCompatibleWith17ByteReplies() {
+        val base = org.kineticos.vesc.codec.VescWriter().u8(0x4B).u8(2).u8(4).u8(0).u8(1).i16(0).u8(0).u8(0).u8(30).u8(30).i16(800).i32(0)
+        assertNull(OnVehicleScript.parseStatus(base.toByteArray())!!.lock)
+        val l = OnVehicleScript.parseStatus(base.u8(0b1111).u8(42).toByteArray())!!.lock!!
+        assertTrue(l.locked && l.pinSet && l.tamper && l.lockedOut); assertEquals(42, l.lockoutRemainingS)
+    }
+
+    @Test fun gateRules() {
+        val unlocked = LockState(false, true, false, false, 0)
+        assertIs<LockDecision.Denied>(gate.planLock("lock", "1234", null, null, still))                                   // no script
+        assertIs<LockDecision.Denied>(gate.planLock("lock", "1234", null, status(null), still))                           // old script
+        assertIs<LockDecision.Denied>(gate.planLock("lock", "1234", null, status(unlocked.copy(pinSet = false)), still))   // no PIN
+        assertIs<LockDecision.Denied>(gate.planLock("lock", "1234", null, status(unlocked), still.copy(speedKmh = 12.0))) // moving
+        assertIs<LockDecision.Denied>(gate.planLock("lock", "1234", null, status(unlocked), still.copy(speedKmh = null))) // speed unknown
+        assertIs<LockDecision.Allowed>(gate.planLock("lock", "1234", null, status(unlocked), still))
+        val locked = unlocked.copy(locked = true)
+        assertIs<LockDecision.Allowed>(gate.planLock("unlock", "1234", null, status(locked), still.copy(speedKmh = 5.0)))
+        assertIs<LockDecision.Denied>(gate.planLock("unlock", "1234", null, status(locked.copy(lockedOut = true, lockoutRemainingS = 30)), still))
+        assertIs<LockDecision.Denied>(gate.planLock("setpin", "1234", "9999", status(locked), still))
+        assertIs<LockDecision.Allowed>(gate.planLock("setpin", "", "9999", status(unlocked.copy(pinSet = false)), still))
+    }
+}

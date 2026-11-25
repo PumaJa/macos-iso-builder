@@ -25,7 +25,7 @@ export async function ingestStates(pool: Pool, vehicleId: string, states: Vehicl
     await client.query('INSERT INTO vehicle_settings (vehicle_id) VALUES ($1) ON CONFLICT DO NOTHING', [vehicleId]);
     const s = (
       await client.query(
-        `SELECT low_battery_pct, maintenance_km, move_alert, parked, low_battery_active, last_fault, last_maint_km,
+        `SELECT low_battery_pct, maintenance_km, move_alert, parked, low_battery_active, last_fault, last_maint_km, tamper_active,
                 ST_Y(anchor::geometry) AS alat, ST_X(anchor::geometry) AS alon
            FROM vehicle_settings WHERE vehicle_id = $1 FOR UPDATE`,
         [vehicleId],
@@ -38,6 +38,7 @@ export async function ingestStates(pool: Pool, vehicleId: string, states: Vehicl
       anchor: s.alat != null ? { lat: s.alat, lon: s.alon } : null,
       lastMaintKm: s.last_maint_km,
       fenceInside: Object.fromEntries(fenceRows.map((f) => [f.id, f.inside])),
+      tamperActive: s.tamper_active,
     };
     const settings = { lowBatteryPct: s.low_battery_pct, maintenanceKm: s.maintenance_km, moveAlert: s.move_alert, parked: s.parked };
 
@@ -81,9 +82,10 @@ export async function ingestStates(pool: Pool, vehicleId: string, states: Vehicl
     );
     await client.query(
       `UPDATE vehicle_settings SET low_battery_active = $2, last_fault = $3, last_maint_km = $4,
-              anchor = CASE WHEN $5::boolean THEN ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END
+              anchor = CASE WHEN $5::boolean THEN ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END,
+              tamper_active = $8
         WHERE vehicle_id = $1`,
-      [vehicleId, tracking.lowBatteryActive, tracking.lastFault, tracking.lastMaintKm, tracking.anchor !== null, tracking.anchor?.lon ?? 0, tracking.anchor?.lat ?? 0],
+      [vehicleId, tracking.lowBatteryActive, tracking.lastFault, tracking.lastMaintKm, tracking.anchor !== null, tracking.anchor?.lon ?? 0, tracking.anchor?.lat ?? 0, tracking.tamperActive ?? false],
     );
     for (const f of fenceRows) {
       const v = tracking.fenceInside[f.id];

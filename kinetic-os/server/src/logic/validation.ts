@@ -51,6 +51,8 @@ export const vehicleStateSchema = z
     faultCode: z.number().int().optional(),
     vescConnected: z.boolean(),
     charging: z.boolean().optional(),
+    locked: z.boolean().optional(),
+    tamper: z.boolean().optional(),
     source: z.enum(['measured', 'simulated']),
   })
   .refine((s) => (s.lat === undefined) === (s.lon === undefined), { message: 'lat and lon must be given together' });
