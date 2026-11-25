@@ -25,8 +25,8 @@
     <string name="toast_not_recording">Keine Aufzeichnung</string>
     <string name="mode_stock">SERIE</string>
     <string name="sim_short">SIMULATION</string>
-    <string name="lock_pill_locked">🔒 GESPERRT</string>
-    <string name="lock_pill_lock">🔓 SPERREN</string>
+    <string name="lock_pill_locked">GESPERRT</string>
+    <string name="lock_pill_lock">SPERREN</string>
     <string name="lock_overlay_title">FAHRZEUG GESPERRT</string>
     <string name="lock_overlay_text">Die Motorleistung ist im Controller gesperrt. Die Sperre bleibt auch ohne dieses Handy und nach dem Aus- und Einschalten aktiv.</string>
     <string name="lock_tamper">⚠ BEWEGUNG BEI GESPERRTEM FAHRZEUG ERKANNT</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">Beitritt fehlgeschlagen</string>
     <string name="grp_help_msg">🆘 HILFE: %1$s @ %2$s</string>
     <string name="grp_help_toast">Hilferuf von %1$s</string>
-    <string name="grp_voice">🎤 Sprachnachricht %1$.0f s</string>
+    <string name="grp_voice">Sprachnachricht %1$.0f s</string>
     <string name="grp_route_updated">Gruppenroute aktualisiert</string>
     <string name="grp_title">Gruppenfahrt</string>
     <string name="grp_server_needed">Kinetic-Gruppenfahrten nutzen Deinen eigenen Server (siehe server/README.md). Trage den Server ein und melde Dich unter Einstellungen → Konto an.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chat</string>
     <string name="grp_message">Nachricht</string>
     <string name="grp_send">SENDEN</string>
-    <string name="grp_rec_voice">🎤 SPRACHE AUFNEHMEN</string>
+    <string name="grp_rec_voice">SPRACHE AUFNEHMEN</string>
     <string name="grp_send_voice">■ SPRACHE SENDEN</string>
     <string name="grp_help">🆘 HILFE</string>
     <string name="grp_no_fix">Kein GPS-Fix</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">LIMIT SETZEN</string>
     <string name="parental_clear">ENTFERNEN</string>
     <string name="parental_note">Nutzt die Sperr-PIN. Das Limit gilt in jedem Modus – auch ohne dieses Handy. Senken geht während der Fahrt, Erhöhen/Entfernen nur im Stand.</string>
+    <string name="set_design">Design</string>
+    <string name="set_orientation">Bildschirmausrichtung</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Quer</string>
+    <string name="orient_portrait">Hoch</string>
+    <string name="set_bg_image">Hintergrundbild</string>
+    <string name="set_bg_dim">Hintergrund abdunkeln</string>
+    <string name="set_logo">Logo</string>
+    <string name="set_brand_name">Name neben dem Logo</string>
+    <string name="set_accent">Akzent-Helligkeit</string>
+    <string name="set_pick">Bild wählen</string>
+    <string name="set_remove">Entfernen</string>
+    <string name="set_design_hint">Bilder bleiben auf diesem Handy. Simulierte Daten bleiben unabhängig vom Design als SIM gekennzeichnet.</string>
+    <string name="lock_screen_title">GESPERRT</string>
+    <string name="lock_chip_immobilizer">Wegfahrsperre aktiv</string>
+    <string name="lock_chip_persist">Bleibt nach Ausschalten</string>
+    <string name="lock_enter_pin">PIN eingeben zum Entsperren</string>
 </resources>

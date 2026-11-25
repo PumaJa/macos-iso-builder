@@ -25,8 +25,8 @@
     <string name="toast_not_recording">Nessuna registrazione</string>
     <string name="mode_stock">ORIGINALE</string>
     <string name="sim_short">SIMULAZIONE</string>
-    <string name="lock_pill_locked">🔒 BLOCCATO</string>
-    <string name="lock_pill_lock">🔓 BLOCCA</string>
+    <string name="lock_pill_locked">BLOCCATO</string>
+    <string name="lock_pill_lock">BLOCCA</string>
     <string name="lock_overlay_title">VEICOLO BLOCCATO</string>
     <string name="lock_overlay_text">L\'uscita motore è disattivata sul controller. Il blocco resta attivo senza questo telefono e dopo lo spegnimento.</string>
     <string name="lock_tamper">⚠ MOVIMENTO RILEVATO CON VEICOLO BLOCCATO</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">accesso al gruppo non riuscito</string>
     <string name="grp_help_msg">🆘 AIUTO: %1$s @ %2$s</string>
     <string name="grp_help_toast">Richiesta di aiuto da %1$s</string>
-    <string name="grp_voice">🎤 vocale %1$.0fs</string>
+    <string name="grp_voice">vocale %1$.0fs</string>
     <string name="grp_route_updated">Percorso del gruppo aggiornato</string>
     <string name="grp_title">Giro di gruppo</string>
     <string name="grp_server_needed">I giri di gruppo Kinetic usano il tuo server self-hosted (vedi server/README.md). Imposta il server e accedi in Impostazioni → Account.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chat</string>
     <string name="grp_message">Messaggio</string>
     <string name="grp_send">INVIA</string>
-    <string name="grp_rec_voice">🎤 REGISTRA VOCALE</string>
+    <string name="grp_rec_voice">REGISTRA VOCALE</string>
     <string name="grp_send_voice">■ INVIA VOCALE</string>
     <string name="grp_help">🆘 AIUTO</string>
     <string name="grp_no_fix">Nessun fix GPS</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">IMPOSTA LIMITE</string>
     <string name="parental_clear">RIMUOVI</string>
     <string name="parental_note">Usa il PIN di blocco. Il limite vale per ogni modalità – anche senza questo telefono. Abbassarlo funziona in marcia, alzarlo/rimuoverlo solo da fermo.</string>
+    <string name="set_design">Design</string>
+    <string name="set_orientation">Orientamento schermo</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Orizzontale</string>
+    <string name="orient_portrait">Verticale</string>
+    <string name="set_bg_image">Immagine di sfondo</string>
+    <string name="set_bg_dim">Scurisci sfondo</string>
+    <string name="set_logo">Logo</string>
+    <string name="set_brand_name">Nome accanto al logo</string>
+    <string name="set_accent">Luminosità accento</string>
+    <string name="set_pick">Scegli immagine</string>
+    <string name="set_remove">Rimuovi</string>
+    <string name="set_design_hint">Le immagini restano su questo telefono. I dati simulati restano contrassegnati SIM.</string>
+    <string name="lock_screen_title">BLOCCATO</string>
+    <string name="lock_chip_immobilizer">Immobilizzatore attivo</string>
+    <string name="lock_chip_persist">Resta dopo lo spegnimento</string>
+    <string name="lock_enter_pin">Inserisci il PIN per sbloccare</string>
 </resources>

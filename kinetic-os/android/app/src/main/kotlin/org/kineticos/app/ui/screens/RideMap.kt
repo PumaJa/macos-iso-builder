@@ -35,8 +35,8 @@ fun RideMap(samples: List<TelemetrySample>, cursor: Float, modifier: Modifier) {
             m.setStyle(Style.Builder().fromUri(if (night) g.settings.value.mapStyleNight else g.settings.value.mapStyleDay)) { st ->
                 st.addSource(GeoJsonSource("track", Feature.fromGeometry(LineString.fromLngLats(pts.map { Point.fromLngLat(it.lon, it.lat) }))))
                 st.addSource(GeoJsonSource("cursor"))
-                st.addLayer(LineLayer("track-l", "track").withProperties(lineColor("#00E0FF"), lineWidth(4f)))
-                st.addLayer(CircleLayer("cursor-c", "cursor").withProperties(circleColor("#FFB020"), circleRadius(8f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
+                st.addLayer(LineLayer("track-l", "track").withProperties(lineColor("#FFFFFF"), lineWidth(4f)))
+                st.addLayer(CircleLayer("cursor-c", "cursor").withProperties(circleColor("#9E9E9E"), circleRadius(8f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
                 val b = LatLngBounds.Builder(); pts.forEach { b.include(LatLng(it.lat, it.lon)) }
                 runCatching { m.moveCamera(CameraUpdateFactory.newLatLngBounds(b.build(), 40)) }
                 style = st

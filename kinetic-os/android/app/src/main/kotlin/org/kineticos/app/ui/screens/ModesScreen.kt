@@ -43,7 +43,7 @@ fun ModesScreen() {
             // M1…M5 quick slots (first five modes) – one tap applies through the SafetyGate
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 profiles.take(5).forEachIndexed { i, pr ->
-                    BigButton("⚡M${i + 1}", Modifier.weight(1f), selected = applied?.id == pr.id, compact = true) { scope.launch { result = g.applyProfile(pr) } }
+                    BigButton("M${i + 1}", Modifier.weight(1f), selected = applied?.id == pr.id, compact = true) { scope.launch { result = g.applyProfile(pr) } }
                 }
             }
             Card(Modifier.fillMaxWidth()) {
@@ -83,7 +83,7 @@ fun ModesScreen() {
 fun CurvePreview(pr: RideProfile, modifier: Modifier) {
     val p = LocalPalette.current
     Canvas(modifier) {
-        drawRect(p.grid, style = Stroke(1f))
+        drawRect(p.surface2)
         val path = Path(); val path2 = Path()
         for (i in 0..40) {
             val x = i / 40.0
@@ -93,7 +93,7 @@ fun CurvePreview(pr: RideProfile, modifier: Modifier) {
             if (i == 0) { path.moveTo(px, size.height - (y * size.height).toFloat()); path2.moveTo(px, size.height - (y2 * size.height).toFloat()) }
             else { path.lineTo(px, size.height - (y * size.height).toFloat()); path2.lineTo(px, size.height - (y2 * size.height).toFloat()) }
         }
-        drawPath(path2, K.Warn.copy(alpha = 0.6f), style = Stroke(2f))
+        drawPath(path2, p.textDim.copy(alpha = 0.6f), style = Stroke(2f))
         drawPath(path, K.Accent, style = Stroke(3f))
     }
 }

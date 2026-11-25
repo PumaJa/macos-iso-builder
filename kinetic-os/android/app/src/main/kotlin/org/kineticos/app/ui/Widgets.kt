@@ -52,11 +52,11 @@ fun PowerArc(fraction: Float, regen: Boolean, modifier: Modifier = Modifier, sim
     val p = LocalPalette.current
     val anim by animateFloatAsState(fraction.coerceIn(0f, 1f), spring(stiffness = Spring.StiffnessMediumLow), label = "arc")
     Canvas(modifier) {
-        val stroke = size.minDimension * 0.06f
+        val stroke = size.minDimension * 0.085f
         val r = Rect(Offset(stroke, stroke), Size(size.width - 2 * stroke, size.height * 2 - 2 * stroke))
-        drawArc(p.grid, 180f, 180f, false, r.topLeft, r.size, style = Stroke(stroke, cap = StrokeCap.Round))
+        drawArc(p.surface2, 180f, 180f, false, r.topLeft, r.size, style = Stroke(stroke, cap = StrokeCap.Round))
         val col = if (simulated) K.Sim else if (regen) K.Regen else K.Accent
-        drawArc(Brush.sweepGradient(listOf(col.copy(alpha = 0.4f), col)), 180f, 180f * anim, false, r.topLeft, r.size, style = Stroke(stroke, cap = StrokeCap.Round))
+        drawArc(col, 180f, 180f * anim, false, r.topLeft, r.size, style = Stroke(stroke, cap = StrokeCap.Round))
         for (i in 0..10) {
             val a = Math.toRadians(180.0 + i * 18.0); val cx = r.center.x; val cy = r.center.y
             val ro = r.width / 2 - stroke * 1.2f; val ri = ro - stroke * (if (i % 5 == 0) 1.2f else 0.6f)
@@ -80,14 +80,14 @@ fun BatteryBar(socPct: Double?, quality: Quality, modifier: Modifier = Modifier)
 @Composable
 fun SimBanner() {
     Box(Modifier.fillMaxWidth().background(K.Sim).padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
-        Text(stringResource(R.string.sim_banner), style = labelStyle(11), color = Color.Black, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.sim_banner), style = labelStyle(11), color = LocalPalette.current.bg, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.clip(RoundedCornerShape(50)).border(1.dp, color, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp)) {
-        Text(text, style = labelStyle(10), color = color)
+    Box(modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 3.dp)) {
+        Text(text.uppercase(), style = labelStyle(10), color = color)
     }
 }
 
@@ -97,21 +97,20 @@ fun BigButton(text: String, modifier: Modifier = Modifier, selected: Boolean = f
     val p = LocalPalette.current
     val h = if (LocalGlove.current) 64.dp else 48.dp
     Box(
-        modifier.heightIn(min = h).clip(RoundedCornerShape(14.dp))
-            .background(if (selected) color.copy(alpha = 0.18f) else p.surface2)
-            .border(if (selected) 2.dp else 1.dp, if (selected) color else p.grid, RoundedCornerShape(14.dp))
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = if (compact) 2.dp else 10.dp),
+        modifier.heightIn(min = h).clip(RoundedCornerShape(if (compact) 14.dp else 50.dp))
+            .background(if (selected) color else p.surface2)
+            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = if (compact) 2.dp else 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = labelStyle(if (compact) 12 else 14).copy(letterSpacing = if (compact) 0.sp else 1.sp), color = if (!enabled) p.textDim else if (selected) color else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+    ) { Text(text.uppercase(), style = labelStyle(if (compact) 13 else 15).copy(fontWeight = FontWeight.Bold, letterSpacing = if (compact) 0.sp else 1.2.sp), color = if (!enabled) p.textDim else if (selected) (if (color == K.Accent) K.OnAccent else Color.Black) else p.text, textAlign = TextAlign.Center, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
 
 @Composable
-fun SectionTitle(t: String) { Text(t.uppercase(), style = labelStyle(13), color = LocalPalette.current.textDim, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp)) }
+fun SectionTitle(t: String) { Text(t.uppercase(), style = titleStyle(20), color = LocalPalette.current.text, modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)) }
 
 @Composable
 fun Card(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val p = LocalPalette.current
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(p.surface).border(1.dp, p.grid, RoundedCornerShape(16.dp)).padding(12.dp), content = content)
+    Column(modifier.clip(RoundedCornerShape(20.dp)).background(p.surface).padding(16.dp), content = content)
 }
 
 /** Simple, fast line chart for telemetry series (multiple series, shared X). */
@@ -136,4 +135,47 @@ fun LineChart(series: List<Pair<Color, List<Float?>>>, modifier: Modifier = Modi
             cursor?.let { c -> val x = size.width * c; drawLine(K.Warn, Offset(x, 0f), Offset(x, size.height), 2f) }
         }
     }
+}
+
+/** Kinetic OS logo: original mark + wordmark. */
+@Composable
+fun KineticLogo(modifier: Modifier = Modifier, size: Int = 22) {
+    val p = LocalPalette.current; val brand = LocalBrand.current
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (brand.logo != null) LogoImage(brand.logo, Modifier.height((size * 1.6f).dp).widthIn(max = (size * 6).dp))
+        else Image(androidx.compose.ui.res.painterResource(R.drawable.ic_kinetic_mark), null, Modifier.size((size * 1.25f).dp), colorFilter = ColorFilter.tint(p.text))
+        if (brand.name.isNotBlank()) {
+            Spacer(Modifier.width(8.dp))
+            Text(brand.name.uppercase(), style = titleStyle(size).copy(letterSpacing = (size / 6f).sp), color = p.text, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun LogoImage(path: String, modifier: Modifier) {
+    val bmp by produceState<ImageBitmap?>(null, path) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
+    }
+    bmp?.let { Image(it, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Fit) }
+}
+
+/**
+ * Vehicle photo from a local file path, decoded off the main thread and downsampled (no network, works offline).
+ * Content URIs fall back to Coil.
+ */
+@Composable
+fun VehiclePhoto(path: String?, modifier: Modifier = Modifier) {
+    if (path == null) return
+    if (!path.startsWith("/")) { coil.compose.AsyncImage(path, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop); return }
+    val bmp by produceState<ImageBitmap?>(null, path) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(path, o)
+                var s = 1; while (o.outWidth / (s * 2) >= 1200) s *= 2
+                android.graphics.BitmapFactory.decodeFile(path, android.graphics.BitmapFactory.Options().apply { inSampleSize = s })?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    bmp?.let { Image(it, null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
 }

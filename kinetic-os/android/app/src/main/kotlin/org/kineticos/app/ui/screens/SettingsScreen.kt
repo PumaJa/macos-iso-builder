@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -34,7 +36,47 @@ fun SettingsScreen() {
     var msg by remember { mutableStateOf<String?>(null) }
     val offText = stringResource(R.string.set_off)
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
+    val bgPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch { ImageStore.import(ctx, uri, "background")?.let { path -> g.settingsRepo.update { it.copy(bgImage = path) } } }
+    }
+    val logoPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch { ImageStore.import(ctx, uri, "logo", maxPx = 512, png = true)?.let { path -> g.settingsRepo.update { it.copy(logoImage = path) } } }
+    }
+    var brandName by remember(s.brandName) { mutableStateOf(s.brandName) }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        // ---- personalisation ----
+        SectionTitle(stringResource(R.string.set_design))
+        Text(stringResource(R.string.set_orientation), color = p.textDim, style = labelStyle(11))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+            ScreenOrientation.entries.forEach { o -> BigButton(stringResource(when (o) { ScreenOrientation.AUTO -> R.string.orient_auto; ScreenOrientation.LANDSCAPE -> R.string.orient_landscape; ScreenOrientation.PORTRAIT -> R.string.orient_portrait }),
+                Modifier.weight(1f), selected = s.orientation == o) { upd { it.copy(orientation = o) } } }
+        }
+        Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Box(Modifier.size(96.dp, 60.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(p.surface2)) { VehiclePhoto(s.bgImage, Modifier.fillMaxSize()) }
+                Text(stringResource(R.string.set_bg_image), color = p.text, style = labelStyle(14), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+                BigButton(stringResource(R.string.set_pick), Modifier.weight(1f)) { bgPicker.launch("image/*") }
+                BigButton(stringResource(R.string.set_remove), Modifier.weight(1f), enabled = s.bgImage != null) { ImageStore.delete(s.bgImage); upd { it.copy(bgImage = null) } }
+            }
+            LabeledSlider(stringResource(R.string.set_bg_dim), s.bgDim, { v -> upd { it.copy(bgDim = v) } }, 0f..1f)
+        }
+        Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                KineticLogo(Modifier.weight(1f), size = 20)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+                BigButton(stringResource(R.string.set_logo) + ": " + stringResource(R.string.set_pick), Modifier.weight(1f), compact = true) { logoPicker.launch("image/*") }
+                BigButton(stringResource(R.string.set_remove), Modifier.weight(0.6f), enabled = s.logoImage != null, compact = true) { ImageStore.delete(s.logoImage); upd { it.copy(logoImage = null) } }
+            }
+            Field(stringResource(R.string.set_brand_name), brandName, { brandName = it.take(24); upd { st -> st.copy(brandName = brandName) } }, Modifier.fillMaxWidth())
+        }
+        LabeledSlider(stringResource(R.string.set_accent), s.accentLevel, { v -> upd { it.copy(accentLevel = v) } }, 0.4f..1f)
+        Text(stringResource(R.string.set_design_hint), color = p.textDim, style = labelStyle(10))
         SectionTitle(stringResource(R.string.set_display))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { ThemeMode.entries.forEach { m -> BigButton(stringResource(when (m) { ThemeMode.NIGHT -> R.string.theme_night; ThemeMode.DAY -> R.string.theme_day; ThemeMode.SUN -> R.string.theme_sun; ThemeMode.AUTO -> R.string.theme_auto }), Modifier.weight(1f), selected = s.theme == m) { upd { it.copy(theme = m) } } } }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {

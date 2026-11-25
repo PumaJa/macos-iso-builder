@@ -63,7 +63,7 @@ fun DashScreen(go: (Screen) -> Unit) {
     val range = s?.let { engine?.rangeKm(it) }
     val script by g.connection.scriptStatus.collectAsStateWithLifecycle()
 
-    Column(Modifier.fillMaxSize().padding(12.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
         // status strip
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             val (txt, col) = when (val st = status) {
@@ -76,12 +76,17 @@ fun DashScreen(go: (Screen) -> Unit) {
             Pill(txt, col, Modifier.padding(end = 6.dp))
             Pill(if (gpsFix != null) stringResource(R.string.dash_gps, gpsFix!!.accuracyM ?: 0.0) else stringResource(R.string.dash_no_gps), if (gpsFix != null) K.Accent else p.textDim, Modifier.padding(end = 6.dp))
             if (rec != null) Pill(stringResource(R.string.dash_rec), K.Danger)
+            Spacer(Modifier.weight(1f))
+            if (landscape) { NeutralPill(); LockPill(); Spacer(Modifier.width(8.dp)) }
+            Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(26, FontWeight.Bold), color = p.text, maxLines = 1)
+        }
+        // second strip: riding time, neutral, lock (own row so nothing gets squeezed)
+        if (!landscape) Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             g.connection.engine?.movingTimeMs?.takeIf { status is ConnStatus.Online }?.let { ms ->
-                Pill("⏱ %dh %02dm".format(ms / 3_600_000, ms / 60_000 % 60), p.textDim, Modifier.padding(start = 6.dp)) }
+                Pill("⏱ %d:%02d".format(ms / 3_600_000, ms / 60_000 % 60), p.text, Modifier.padding(end = 6.dp)) }
             Spacer(Modifier.weight(1f))
             NeutralPill()
             LockPill()
-            Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(now)), style = numStyle(22), color = p.text)
         }
         if (status !is ConnStatus.Online) {
             Spacer(Modifier.height(24.dp))
@@ -103,7 +108,7 @@ fun DashScreen(go: (Screen) -> Unit) {
                 }
             }) { _, dx -> acc += dx }
         }
-        val main: @Composable (Modifier) -> Unit = { m0 ->
+        val main: @Composable (Modifier, Boolean) -> Unit = { m0, showBadge ->
             val m = m0.then(swipeMod)
             Column(m, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.fillMaxWidth(0.95f).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
@@ -115,7 +120,7 @@ fun DashScreen(go: (Screen) -> Unit) {
                         PrimaryValue.BATTERY_CURRENT -> Triple(s?.batteryCurrentA ?: Q.NA, 1.0, stringResource(R.string.dash_a_battery, qTag((s?.batteryCurrentA ?: Q.NA).quality)))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(fmt(mainQ, 0, mainScale), style = numStyle(if (landscape) 110 else 96, if (p.sun) FontWeight.Bold else FontWeight.Thin), color = qColor(mainQ.quality, p.text), maxLines = 1)
+                        Text(fmt(mainQ, 0, mainScale), style = numStyle(if (landscape) 130 else 120, FontWeight.Bold), color = qColor(mainQ.quality, p.text), maxLines = 1)
                         Text(mainLabel, style = labelStyle(12), color = p.textDim)
                     }
                 }
@@ -129,7 +134,7 @@ fun DashScreen(go: (Screen) -> Unit) {
                         Text(" $speedUnit", style = labelStyle(12), color = p.textDim)
                     }
                 }
-                ModeBadge(applied, script)
+                if (showBadge) ModeBadge(applied, script)
             }
         }
         val side: @Composable (Modifier) -> Unit = { m ->
@@ -149,12 +154,35 @@ fun DashScreen(go: (Screen) -> Unit) {
                 if ((s?.faultCode ?: 0) != 0) Pill(stringResource(R.string.dash_fault, (s?.faultName ?: s?.faultCode).toString()), K.Danger, Modifier.padding(4.dp))
             }
         }
-        if (landscape) Row(Modifier.weight(1f)) { main(Modifier.weight(1.3f).fillMaxHeight()); side(Modifier.weight(1f).padding(start = 8.dp)) }
-        else { main(Modifier.fillMaxWidth().weight(1f)); side(Modifier.fillMaxWidth()) }
+        if (landscape) Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            // left: mode · riding time · power (large, readable at a glance)
+            Column(Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
+                BigStat(stringResource(R.string.home_mode), (applied?.name ?: stringResource(R.string.mode_stock)).uppercase(), if (applied == null) p.textDim else p.text)
+                val ms = engine?.movingTimeMs ?: 0L
+                BigStat(stringResource(R.string.home_riding_time), "%d:%02d".format(ms / 3_600_000, ms / 60_000 % 60), p.text)
+                BigStat("$pUnit · " + stringResource(if (pw < 0) R.string.dash_regen else R.string.dash_power), fmt(power, 1, pScale), qColor(power.quality, p.text))
+            }
+            // centre: gauge + main value
+            main(Modifier.weight(1.5f).fillMaxHeight(), false)
+            // right: battery + selected tiles
+            Column(Modifier.weight(0.85f).fillMaxHeight().padding(start = 8.dp), verticalArrangement = Arrangement.Center) {
+                val soc = s?.socPct ?: Q.NA
+                Text(stringResource(R.string.home_battery), style = labelStyle(10), color = p.textDim)
+                Text(fmt(soc, 0) + "%", style = numStyle(64, FontWeight.Bold), color = qColor(soc.quality, p.text))
+                BatteryBar(soc.value, soc.quality, Modifier.fillMaxWidth())
+                Text("${qTag(soc.quality)} · ${range?.let { stringResource(R.string.dash_range_est, it) } ?: stringResource(R.string.dash_range_na)}", style = labelStyle(10), color = p.textDim)
+                Spacer(Modifier.height(6.dp))
+                settings.dashTiles.take(4).chunked(2).forEach { row ->
+                    Row { row.forEach { key -> DashTile(key, s, engine, simulated, Modifier.weight(1f)) }; repeat(2 - row.size) { Spacer(Modifier.weight(1f)) } }
+                }
+                if ((s?.faultCode ?: 0) != 0) Pill(stringResource(R.string.dash_fault, (s?.faultName ?: s?.faultCode).toString()), K.Danger, Modifier.padding(4.dp))
+            }
+        }
+        else { main(Modifier.fillMaxWidth().weight(1f), true); side(Modifier.fillMaxWidth()) }
 
         // vehicle + quick modes
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (vehicle?.photoUri != null) AsyncImage(vehicle!!.photoUri, vehicle!!.name, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+            if (vehicle?.photoUri != null) VehiclePhoto(vehicle!!.photoUri, Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)))
             Column(Modifier.padding(horizontal = 6.dp).widthIn(max = 96.dp)) {
                 Text(vehicle?.name ?: stringResource(R.string.dash_no_vehicle), style = labelStyle(12), color = p.text, maxLines = 2)
                 Text(applied?.name ?: stringResource(R.string.mode_stock), style = labelStyle(10), color = K.Accent)
@@ -163,6 +191,15 @@ fun DashScreen(go: (Screen) -> Unit) {
                 BigButton(pr.name, Modifier.weight(1f).padding(horizontal = 2.dp), selected = applied?.id == pr.id, compact = true) { scope.launch { g.toast(g.applyProfile(pr)) } }
             }
         }
+    }
+}
+
+@Composable
+private fun BigStat(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    val p = LocalPalette.current
+    Column {
+        Text(label.uppercase(), style = labelStyle(10), color = p.textDim, maxLines = 1)
+        Text(value, style = numStyle(46, FontWeight.Bold), color = color, maxLines = 1)
     }
 }
 
@@ -202,10 +239,10 @@ fun DashTile(key: String, s: org.kineticos.telemetry.TelemetrySample?, engine: o
 fun ModeBadge(applied: org.kineticos.vehicle.RideProfile?, script: org.kineticos.vehicle.ScriptStatus?) {
     val p = LocalPalette.current
     val name = applied?.name ?: stringResource(R.string.mode_stock)
-    val col = when (applied?.id) { "eco" -> K.Regen; "race" -> K.Danger; "crawl" -> K.Warn; null -> p.textDim; else -> K.Accent }
+    val col = if (applied == null) p.textDim else K.Accent
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 6.dp)) {
-        Box(Modifier.clip(RoundedCornerShape(10.dp)).background(col.copy(alpha = 0.18f)).border(2.dp, col, RoundedCornerShape(10.dp)).padding(horizontal = 18.dp, vertical = 4.dp)) {
-            Text(name, style = labelStyle(22).copy(fontWeight = FontWeight.Bold), color = col)
+        Box(Modifier.clip(RoundedCornerShape(50)).background(col).padding(horizontal = 22.dp, vertical = 2.dp)) {
+            Text(name.uppercase(), style = titleStyle(26), color = if (applied == null) androidx.compose.ui.graphics.Color.Black else K.OnAccent)
         }
         applied?.let { Text(stringResource(R.string.mode_regen_char, it.regenFraction * 100, it.character.uiLabel().uppercase()), style = labelStyle(10), color = p.textDim) }
         script?.let { sc ->

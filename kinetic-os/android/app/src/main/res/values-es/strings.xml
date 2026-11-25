@@ -25,8 +25,8 @@
     <string name="toast_not_recording">No se está grabando</string>
     <string name="mode_stock">ORIGINAL</string>
     <string name="sim_short">SIMULACIÓN</string>
-    <string name="lock_pill_locked">🔒 BLOQUEADO</string>
-    <string name="lock_pill_lock">🔓 BLOQUEAR</string>
+    <string name="lock_pill_locked">BLOQUEADO</string>
+    <string name="lock_pill_lock">BLOQUEAR</string>
     <string name="lock_overlay_title">VEHÍCULO BLOQUEADO</string>
     <string name="lock_overlay_text">La salida del motor está desactivada en el controlador. El bloqueo sigue activo sin este teléfono y tras apagar y encender.</string>
     <string name="lock_tamper">⚠ MOVIMIENTO DETECTADO CON EL VEHÍCULO BLOQUEADO</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">no se pudo unir al grupo</string>
     <string name="grp_help_msg">🆘 AYUDA: %1$s @ %2$s</string>
     <string name="grp_help_toast">Petición de ayuda de %1$s</string>
-    <string name="grp_voice">🎤 voz %1$.0fs</string>
+    <string name="grp_voice">voz %1$.0fs</string>
     <string name="grp_route_updated">Ruta del grupo actualizada</string>
     <string name="grp_title">Ruta en grupo</string>
     <string name="grp_server_needed">Las rutas en grupo de Kinetic usan tu propio servidor (ver server/README.md). Define el servidor e inicia sesión en Ajustes → Cuenta.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chat</string>
     <string name="grp_message">Mensaje</string>
     <string name="grp_send">ENVIAR</string>
-    <string name="grp_rec_voice">🎤 GRABAR VOZ</string>
+    <string name="grp_rec_voice">GRABAR VOZ</string>
     <string name="grp_send_voice">■ ENVIAR VOZ</string>
     <string name="grp_help">🆘 AYUDA</string>
     <string name="grp_no_fix">Sin fijación GPS</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">FIJAR LÍMITE</string>
     <string name="parental_clear">QUITAR</string>
     <string name="parental_note">Usa el PIN de bloqueo. El límite se aplica a todos los modos – también sin este teléfono. Bajarlo funciona en marcha; subirlo o quitarlo solo con el vehículo parado.</string>
+    <string name="set_design">Diseño</string>
+    <string name="set_orientation">Orientación de pantalla</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Horizontal</string>
+    <string name="orient_portrait">Vertical</string>
+    <string name="set_bg_image">Imagen de fondo</string>
+    <string name="set_bg_dim">Oscurecer fondo</string>
+    <string name="set_logo">Logo</string>
+    <string name="set_brand_name">Nombre junto al logo</string>
+    <string name="set_accent">Brillo del acento</string>
+    <string name="set_pick">Elegir imagen</string>
+    <string name="set_remove">Quitar</string>
+    <string name="set_design_hint">Las imágenes se quedan en este teléfono. Los datos simulados siguen marcados como SIM.</string>
+    <string name="lock_screen_title">BLOQUEADO</string>
+    <string name="lock_chip_immobilizer">Inmovilizador activo</string>
+    <string name="lock_chip_persist">Se mantiene al apagar</string>
+    <string name="lock_enter_pin">Introduce el PIN para desbloquear</string>
 </resources>

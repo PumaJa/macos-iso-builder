@@ -122,13 +122,13 @@ fun MapScreen() {
             m.setStyle(Style.Builder().fromUri(if (night) settings.mapStyleNight else settings.mapStyleDay)) { st ->
                 fun src(id: String) = st.addSource(GeoJsonSource(id))
                 listOf("trail", "route", "plan", "wpts", "members", "me").forEach { src(it) }
-                st.addLayer(LineLayer("route-l", "route").withProperties(lineColor("#FFB020"), lineWidth(5f), lineOpacity(0.85f)))
-                st.addLayer(LineLayer("plan-l", "plan").withProperties(lineColor("#FF4FD8"), lineWidth(4f), lineDasharray(arrayOf(2f, 1f))))
-                st.addLayer(LineLayer("trail-l", "trail").withProperties(lineColor("#00E0FF"), lineWidth(4f)))
-                st.addLayer(CircleLayer("wpts-c", "wpts").withProperties(circleColor("#FFB020"), circleRadius(7f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
-                st.addLayer(CircleLayer("members-c", "members").withProperties(circleColor("#39FF88"), circleRadius(9f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
+                st.addLayer(LineLayer("route-l", "route").withProperties(lineColor("#E0E0E0"), lineWidth(5f), lineOpacity(0.85f)))
+                st.addLayer(LineLayer("plan-l", "plan").withProperties(lineColor("#9E9E9E"), lineWidth(4f), lineDasharray(arrayOf(2f, 1f))))
+                st.addLayer(LineLayer("trail-l", "trail").withProperties(lineColor("#FFFFFF"), lineWidth(4f)))
+                st.addLayer(CircleLayer("wpts-c", "wpts").withProperties(circleColor("#9E9E9E"), circleRadius(7f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
+                st.addLayer(CircleLayer("members-c", "members").withProperties(circleColor("#D0D0D0"), circleRadius(9f), circleStrokeColor("#000000"), circleStrokeWidth(2f)))
                 st.addLayer(SymbolLayer("members-t", "members").withProperties(textField("{name}"), textOffset(arrayOf(0f, 1.6f)), textSize(13f), textColor(if (night) "#FFFFFF" else "#000000"), textHaloColor(if (night) "#000000" else "#FFFFFF"), textHaloWidth(1.5f)))
-                st.addLayer(CircleLayer("me-c", "me").withProperties(circleColor("#00E0FF"), circleRadius(10f), circleStrokeColor("#FFFFFF"), circleStrokeWidth(3f)))
+                st.addLayer(CircleLayer("me-c", "me").withProperties(circleColor("#FFFFFF"), circleRadius(10f), circleStrokeColor("#000000"), circleStrokeWidth(3f)))
                 styleReady = st
             }
             m.addOnMapClickListener { ll ->

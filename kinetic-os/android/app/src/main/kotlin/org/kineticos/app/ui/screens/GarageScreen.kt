@@ -47,7 +47,7 @@ fun GarageScreen() {
         vehicles.forEach { v ->
             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { scope.launch { g.selectVehicle(v.id) } }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (v.photoUri != null) AsyncImage(v.photoUri, v.name, Modifier.size(84.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                    if (v.photoUri != null) VehiclePhoto(v.photoUri, Modifier.size(84.dp).clip(RoundedCornerShape(16.dp)))
                     Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                         Text(v.name, style = labelStyle(16), color = if (active?.id == v.id) K.Accent else p.text)
                         Text("${v.manufacturer} ${v.model} · ${v.type.uiLabel()}", color = p.textDim)
@@ -112,7 +112,7 @@ private fun VehicleEditor(initial: VehicleProfile, done: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
         SectionTitle(stringResource(R.string.veh_title))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (v.photoUri != null) AsyncImage(v.photoUri, null, Modifier.size(120.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
+            if (v.photoUri != null) VehiclePhoto(v.photoUri, Modifier.size(120.dp).clip(RoundedCornerShape(16.dp)))
             Spacer(Modifier.width(8.dp)); BigButton(stringResource(R.string.veh_photo)) { photoPicker.launch("image/*") }
         }
         Field(stringResource(R.string.edit_name), v.name, { v = v.copy(name = it) }, Modifier.fillMaxWidth(), error = err("name"))

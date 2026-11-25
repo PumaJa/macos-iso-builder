@@ -25,8 +25,8 @@
     <string name="toast_not_recording">Not recording</string>
     <string name="mode_stock">STOCK</string>
     <string name="sim_short">SIMULATION</string>
-    <string name="lock_pill_locked">🔒 LOCKED</string>
-    <string name="lock_pill_lock">🔓 LOCK</string>
+    <string name="lock_pill_locked">LOCKED</string>
+    <string name="lock_pill_lock">LOCK</string>
     <string name="lock_overlay_title">VEHICLE LOCKED</string>
     <string name="lock_overlay_text">Motor output is disabled on the controller. The lock stays active without this phone and after power cycling.</string>
     <string name="lock_tamper">⚠ MOVEMENT DETECTED WHILE LOCKED</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">join failed</string>
     <string name="grp_help_msg">🆘 HELP: %1$s @ %2$s</string>
     <string name="grp_help_toast">Help request from %1$s</string>
-    <string name="grp_voice">🎤 voice %1$.0fs</string>
+    <string name="grp_voice">voice %1$.0fs</string>
     <string name="grp_route_updated">Group route updated</string>
     <string name="grp_title">Group ride</string>
     <string name="grp_server_needed">Kinetic group rides use your own self-hosted server (see server/README.md). Set the server and log in under Settings → Account.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chat</string>
     <string name="grp_message">Message</string>
     <string name="grp_send">SEND</string>
-    <string name="grp_rec_voice">🎤 RECORD VOICE</string>
+    <string name="grp_rec_voice">RECORD VOICE</string>
     <string name="grp_send_voice">■ SEND VOICE</string>
     <string name="grp_help">🆘 HELP</string>
     <string name="grp_no_fix">No GPS fix</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">SET LIMIT</string>
     <string name="parental_clear">REMOVE</string>
     <string name="parental_note">Uses the lock PIN. The limit applies to every mode – also without this phone. Lowering works while riding, raising/removing only at standstill.</string>
+    <string name="set_design">Design</string>
+    <string name="set_orientation">Screen orientation</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Landscape</string>
+    <string name="orient_portrait">Portrait</string>
+    <string name="set_bg_image">Background image</string>
+    <string name="set_bg_dim">Background darkening</string>
+    <string name="set_logo">Logo</string>
+    <string name="set_brand_name">Name next to logo</string>
+    <string name="set_accent">Accent brightness</string>
+    <string name="set_pick">Choose image</string>
+    <string name="set_remove">Remove</string>
+    <string name="set_design_hint">Images stay on this phone. Simulated data stays labelled SIM regardless of the design.</string>
+    <string name="lock_screen_title">LOCKED</string>
+    <string name="lock_chip_immobilizer">Immobilizer active</string>
+    <string name="lock_chip_persist">Survives power-off</string>
+    <string name="lock_enter_pin">Enter PIN to unlock</string>
 </resources>

@@ -14,6 +14,7 @@ enum class PrimaryValue { SPEED, POWER, BATTERY_CURRENT }
 val DEFAULT_TILES = listOf("VOLT", "BATT_A", "MOTOR_A", "FET", "MOTOR_T", "TRIP")
 enum class SpeedUnit { KMH, MPH }
 enum class PowerUnit { KW, PS, HP }
+enum class ScreenOrientation { AUTO, LANDSCAPE, PORTRAIT }
 
 data class AppSettings(
     val activeVehicleId: String? = null,
@@ -46,6 +47,18 @@ data class AppSettings(
     val dashTiles: List<String> = DEFAULT_TILES,
     /** App screen brightness 0.05..1, or -1 = follow system. */
     val screenBrightness: Float = -1f,
+    // ---- personalisation (all optional; images are copied into app storage) ----
+    val orientation: ScreenOrientation = ScreenOrientation.LANDSCAPE,
+    /** Background image behind all screens (local file path) or null = plain black. */
+    val bgImage: String? = null,
+    /** 0 = image fully visible … 1 = black. */
+    val bgDim: Float = 0.6f,
+    /** Own logo image (local file path) or null = built-in Kinetic mark. */
+    val logoImage: String? = null,
+    /** Text next to the logo; empty = no text. */
+    val brandName: String = "KINETIC",
+    /** Grey level of the accent colour on dark themes (0.5 = mid grey … 1 = white). */
+    val accentLevel: Float = 0.95f,
 )
 
 class SettingsRepo(private val ctx: Context) {
@@ -60,6 +73,8 @@ class SettingsRepo(private val ctx: Context) {
         val share = booleanPreferencesKey("share"); val styleDay = stringPreferencesKey("styleDay"); val styleNight = stringPreferencesKey("styleNight")
         val saver = booleanPreferencesKey("saver"); val alerts = booleanPreferencesKey("alerts"); val voice = booleanPreferencesKey("voice"); val vib = booleanPreferencesKey("vib")
         val pip = booleanPreferencesKey("pip"); val primary = stringPreferencesKey("primary"); val tiles = stringPreferencesKey("tiles"); val bright = floatPreferencesKey("bright")
+        val orient = stringPreferencesKey("orient"); val bg = stringPreferencesKey("bgImage"); val bgDim = floatPreferencesKey("bgDim")
+        val logo = stringPreferencesKey("logoImage"); val brand = stringPreferencesKey("brand"); val accent = floatPreferencesKey("accentLevel")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -76,6 +91,8 @@ class SettingsRepo(private val ctx: Context) {
             p[K.primary]?.let { runCatching { PrimaryValue.valueOf(it) }.getOrNull() } ?: d.primaryValue,
             p[K.tiles]?.split(',')?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: d.dashTiles,
             p[K.bright] ?: d.screenBrightness,
+            p[K.orient]?.let { runCatching { ScreenOrientation.valueOf(it) }.getOrNull() } ?: d.orientation,
+            p[K.bg], p[K.bgDim] ?: d.bgDim, p[K.logo], p[K.brand] ?: d.brandName, p[K.accent] ?: d.accentLevel,
         )
     }
     suspend fun current() = flow.first()
@@ -90,6 +107,8 @@ class SettingsRepo(private val ctx: Context) {
             put(K.user, n.username); put(K.tele, n.telematicsEnabled); put(K.share, n.shareTelemetryInGroups)
             put(K.styleDay, n.mapStyleDay); put(K.styleNight, n.mapStyleNight); put(K.saver, n.powerSaver); put(K.alerts, n.alertNotifications); put(K.voice, n.voiceAlerts); put(K.vib, n.vibrateAlerts); put(K.pip, n.pipOnLeave)
             put(K.primary, n.primaryValue.name); put(K.tiles, n.dashTiles.take(9).joinToString(",")); put(K.bright, n.screenBrightness)
+            put(K.orient, n.orientation.name); put(K.bg, n.bgImage); put(K.bgDim, n.bgDim.coerceIn(0f, 1f)); put(K.logo, n.logoImage)
+            put(K.brand, n.brandName.take(24)); put(K.accent, n.accentLevel.coerceIn(0.4f, 1f))
         }
     }
 }

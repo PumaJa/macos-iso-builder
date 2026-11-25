@@ -25,8 +25,8 @@
     <string name="toast_not_recording">Spelar inte in</string>
     <string name="mode_stock">STANDARD</string>
     <string name="sim_short">SIMULERING</string>
-    <string name="lock_pill_locked">🔒 LÅST</string>
-    <string name="lock_pill_lock">🔓 LÅS</string>
+    <string name="lock_pill_locked">LÅST</string>
+    <string name="lock_pill_lock">LÅS</string>
     <string name="lock_overlay_title">FORDONET LÅST</string>
     <string name="lock_overlay_text">Motorutgången är avstängd i styrenheten. Låset förblir aktivt utan den här telefonen och efter strömavbrott.</string>
     <string name="lock_tamper">⚠ RÖRELSE UPPTÄCKT MEDAN LÅST</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">kunde inte gå med</string>
     <string name="grp_help_msg">🆘 HJÄLP: %1$s @ %2$s</string>
     <string name="grp_help_toast">Hjälpbegäran från %1$s</string>
-    <string name="grp_voice">🎤 röst %1$.0fs</string>
+    <string name="grp_voice">röst %1$.0fs</string>
     <string name="grp_route_updated">Gruppens rutt uppdaterad</string>
     <string name="grp_title">Gruppåkning</string>
     <string name="grp_server_needed">Kinetics gruppåkningar använder din egen server (se server/README.md). Ange servern och logga in under Inställningar → Konto.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chatt</string>
     <string name="grp_message">Meddelande</string>
     <string name="grp_send">SKICKA</string>
-    <string name="grp_rec_voice">🎤 SPELA IN RÖST</string>
+    <string name="grp_rec_voice">SPELA IN RÖST</string>
     <string name="grp_send_voice">■ SKICKA RÖST</string>
     <string name="grp_help">🆘 HJÄLP</string>
     <string name="grp_no_fix">Ingen GPS-fix</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">SÄTT GRÄNS</string>
     <string name="parental_clear">TA BORT</string>
     <string name="parental_note">Använder lås-PIN. Gränsen gäller i alla lägen – även utan den här telefonen. Sänkning fungerar under körning, höjning/borttagning bara vid stillastående.</string>
+    <string name="set_design">Design</string>
+    <string name="set_orientation">Skärmorientering</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Liggande</string>
+    <string name="orient_portrait">Stående</string>
+    <string name="set_bg_image">Bakgrundsbild</string>
+    <string name="set_bg_dim">Mörka bakgrunden</string>
+    <string name="set_logo">Logotyp</string>
+    <string name="set_brand_name">Namn bredvid logotypen</string>
+    <string name="set_accent">Accentens ljusstyrka</string>
+    <string name="set_pick">Välj bild</string>
+    <string name="set_remove">Ta bort</string>
+    <string name="set_design_hint">Bilderna stannar på telefonen. Simulerad data märks alltid SIM.</string>
+    <string name="lock_screen_title">LÅST</string>
+    <string name="lock_chip_immobilizer">Startspärr aktiv</string>
+    <string name="lock_chip_persist">Kvar efter avstängning</string>
+    <string name="lock_enter_pin">Ange PIN för att låsa upp</string>
 </resources>

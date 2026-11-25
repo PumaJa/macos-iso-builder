@@ -25,8 +25,8 @@
     <string name="toast_not_recording">Pas d\'enregistrement</string>
     <string name="mode_stock">SÉRIE</string>
     <string name="sim_short">SIMULATION</string>
-    <string name="lock_pill_locked">🔒 VERROUILLÉ</string>
-    <string name="lock_pill_lock">🔓 VERROUILLER</string>
+    <string name="lock_pill_locked">VERROUILLÉ</string>
+    <string name="lock_pill_lock">VERROUILLER</string>
     <string name="lock_overlay_title">VÉHICULE VERROUILLÉ</string>
     <string name="lock_overlay_text">La sortie moteur est désactivée sur le contrôleur. Le verrouillage reste actif sans ce téléphone et après coupure de l\'alimentation.</string>
     <string name="lock_tamper">⚠ MOUVEMENT DÉTECTÉ PENDANT LE VERROUILLAGE</string>
@@ -444,7 +444,7 @@
     <string name="grp_join_failed">échec de la connexion au groupe</string>
     <string name="grp_help_msg">🆘 AIDE : %1$s @ %2$s</string>
     <string name="grp_help_toast">Demande d\'aide de %1$s</string>
-    <string name="grp_voice">🎤 vocal %1$.0fs</string>
+    <string name="grp_voice">vocal %1$.0fs</string>
     <string name="grp_route_updated">Itinéraire du groupe mis à jour</string>
     <string name="grp_title">Sortie en groupe</string>
     <string name="grp_server_needed">Les sorties en groupe Kinetic utilisent votre propre serveur auto-hébergé (voir server/README.md). Définissez le serveur et connectez-vous dans Réglages → Compte.</string>
@@ -467,7 +467,7 @@
     <string name="grp_chat">Chat</string>
     <string name="grp_message">Message</string>
     <string name="grp_send">ENVOYER</string>
-    <string name="grp_rec_voice">🎤 ENREGISTRER VOCAL</string>
+    <string name="grp_rec_voice">ENREGISTRER VOCAL</string>
     <string name="grp_send_voice">■ ENVOYER VOCAL</string>
     <string name="grp_help">🆘 AIDE</string>
     <string name="grp_no_fix">Pas de fix GPS</string>
@@ -579,4 +579,21 @@
     <string name="parental_apply">DÉFINIR LIMITE</string>
     <string name="parental_clear">RETIRER</string>
     <string name="parental_note">Utilise le PIN de verrouillage. La limite s\'applique à tous les modes – même sans ce téléphone. Abaisser fonctionne en roulant, relever/retirer seulement à l\'arrêt.</string>
+    <string name="set_design">Design</string>
+    <string name="set_orientation">Orientation de l’écran</string>
+    <string name="orient_auto">Auto</string>
+    <string name="orient_landscape">Paysage</string>
+    <string name="orient_portrait">Portrait</string>
+    <string name="set_bg_image">Image de fond</string>
+    <string name="set_bg_dim">Assombrir le fond</string>
+    <string name="set_logo">Logo</string>
+    <string name="set_brand_name">Nom à côté du logo</string>
+    <string name="set_accent">Luminosité de l’accent</string>
+    <string name="set_pick">Choisir une image</string>
+    <string name="set_remove">Supprimer</string>
+    <string name="set_design_hint">Les images restent sur ce téléphone. Les données simulées restent marquées SIM.</string>
+    <string name="lock_screen_title">VERROUILLÉ</string>
+    <string name="lock_chip_immobilizer">Antidémarrage actif</string>
+    <string name="lock_chip_persist">Reste après extinction</string>
+    <string name="lock_enter_pin">Saisir le PIN pour déverrouiller</string>
 </resources>

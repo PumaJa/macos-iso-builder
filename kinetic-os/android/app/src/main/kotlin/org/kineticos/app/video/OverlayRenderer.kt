@@ -26,7 +26,7 @@ class OverlayRenderer(val width: Int, val height: Int, private val maxPowerW: Do
     private val u = height / 100f
     private val big = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 34 * u; typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL); setShadowLayer(3 * u / 4, 0f, 0f, Color.BLACK) }
     private val small = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 7 * u; letterSpacing = 0.15f; setShadowLayer(u / 2, 0f, 0f, Color.BLACK) }
-    private val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 224, 255); textSize = 11 * u; setShadowLayer(u / 2, 0f, 0f, Color.BLACK) }
+    private val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(242, 242, 242); textSize = 11 * u; setShadowLayer(u / 2, 0f, 0f, Color.BLACK) }
     private val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4 * u; strokeCap = Paint.Cap.ROUND }
     private val bg = Paint().apply { color = Color.argb(90, 0, 0, 0) }
     private var lastKey: String? = null
@@ -48,12 +48,12 @@ class OverlayRenderer(val width: Int, val height: Int, private val maxPowerW: Do
         // power bar (cyan) / regen bar (green)
         val frac = ((kotlin.math.abs(pw ?: 0.0)) / maxPowerW).coerceIn(0.0, 1.0).toFloat()
         bar.color = Color.argb(120, 255, 255, 255); c.drawLine(pad, 70 * u, width - pad, 70 * u, bar)
-        bar.color = if ((pw ?: 0.0) < 0) Color.rgb(57, 255, 136) else Color.rgb(0, 224, 255)
+        bar.color = if ((pw ?: 0.0) < 0) Color.rgb(170, 170, 170) else Color.rgb(242, 242, 242)
         if (frac > 0) c.drawLine(pad, 70 * u, pad + (width - 2 * pad) * frac, 70 * u, bar)
         val line = listOfNotNull(s.socPct.value?.let { "%.0f%%".format(it) }, s.tempMotorC.value?.let { "MOT %.0f°C".format(it) },
             s.leanDeg.value?.let { "LEAN %.0f°".format(it) }, s.gps?.altM?.let { "%.0f m".format(it) }).joinToString("   ")
         c.drawText(line, pad, 86 * u, small)
-        if (s.simulated) { small.color = Color.rgb(255, 79, 216); c.drawText("SIMULATION", width - pad - small.measureText("SIMULATION"), 12 * u, small); small.color = Color.WHITE }
+        if (s.simulated) { small.color = Color.rgb(160, 160, 160); c.drawText("SIMULATION", width - pad - small.measureText("SIMULATION"), 12 * u, small); small.color = Color.WHITE }
         return bmp
     }
 }

@@ -29,7 +29,8 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], qualifiers = "de-w411dp-h891dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-class GalleryTest {
+open class GalleryTest {
+    protected open val prefix = ""
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private val ctx = ApplicationProvider.getApplicationContext<Context>()
     private val out = File(System.getProperty("user.dir"), "build/gallery").apply { mkdirs() }
@@ -44,21 +45,35 @@ class GalleryTest {
         val v = compose.activity.window.decorView
         val bmp = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
         v.draw(Canvas(bmp))
-        out.resolve("$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        out.resolve("$prefix$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         compose.mainClock.autoAdvance = true
     }
     private fun open(screen: String, settleMs: Long = 1500) { compose.activity.openScreen.tryEmit(screen); pump(settleMs); compose.waitForIdle() }
 
     /** Simple original illustration used as the "vehicle photo" (placeholder – the user sets a real photo). */
     private fun drawnPhoto(): String {
-        val b = Bitmap.createBitmap(800, 600, Bitmap.Config.ARGB_8888); val c = Canvas(b)
-        c.drawColor(Color.rgb(18, 24, 30))
-        val wheel = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 26f; color = Color.rgb(200, 210, 220) }
-        c.drawCircle(220f, 400f, 120f, wheel); c.drawCircle(600f, 400f, 120f, wheel)
-        val frame = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 30f; color = Color.rgb(0, 224, 255); strokeCap = Paint.Cap.ROUND }
-        c.drawLine(220f, 400f, 380f, 260f, frame); c.drawLine(380f, 260f, 560f, 250f, frame); c.drawLine(560f, 250f, 600f, 400f, frame)
-        c.drawLine(380f, 260f, 420f, 400f, frame); c.drawLine(420f, 400f, 220f, 400f, frame); c.drawLine(540f, 180f, 600f, 400f, frame)
-        c.drawRoundRect(RectF(330f, 300f, 470f, 380f), 20f, 20f, Paint().apply { color = Color.rgb(40, 50, 60) })
+        val w = 1200f; val h = 800f
+        val b = Bitmap.createBitmap(w.toInt(), h.toInt(), Bitmap.Config.ARGB_8888); val c = Canvas(b)
+        // studio backdrop
+        c.drawPaint(Paint().apply { shader = RadialGradient(w * 0.55f, h * 0.45f, w * 0.7f, Color.rgb(58, 60, 66), Color.rgb(6, 6, 8), Shader.TileMode.CLAMP) })
+        c.drawRect(0f, h * 0.78f, w, h, Paint().apply { shader = LinearGradient(0f, h * 0.78f, 0f, h, Color.rgb(28, 28, 32), Color.BLACK, Shader.TileMode.CLAMP) })
+        val aa = Paint.ANTI_ALIAS_FLAG
+        val tire = Paint(aa).apply { style = Paint.Style.STROKE; strokeWidth = 34f; color = Color.rgb(18, 18, 20) }
+        val rim = Paint(aa).apply { style = Paint.Style.STROKE; strokeWidth = 8f; color = Color.rgb(150, 155, 165) }
+        val rearC = PointF(330f, 560f); val frontC = PointF(900f, 560f); val r = 150f
+        listOf(rearC, frontC).forEach { p -> c.drawCircle(p.x, p.y + 6, r, Paint(aa).apply { color = Color.argb(90, 0, 0, 0) }); c.drawCircle(p.x, p.y, r, tire); c.drawCircle(p.x, p.y, r - 30, rim)
+            c.drawCircle(p.x, p.y, 26f, Paint(aa).apply { color = Color.rgb(90, 92, 100) }) }
+        val metal = Paint(aa).apply { strokeWidth = 22f; color = Color.rgb(200, 204, 212); strokeCap = Paint.Cap.ROUND }
+        c.drawLine(frontC.x, frontC.y, 780f, 250f, metal)                      // fork
+        c.drawLine(rearC.x, rearC.y, 560f, 470f, metal)                        // swing arm
+        val body = Paint(aa).apply { color = Color.rgb(235, 235, 238) }
+        val path = Path().apply { moveTo(470f, 330f); lineTo(760f, 270f); lineTo(800f, 330f); lineTo(650f, 400f); lineTo(520f, 420f); close() }
+        c.drawPath(path, body)                                                 // tank/shroud
+        val seat = Path().apply { moveTo(300f, 330f); lineTo(520f, 320f); lineTo(500f, 350f); lineTo(280f, 360f); close() }
+        c.drawPath(seat, Paint(aa).apply { color = Color.rgb(30, 30, 34) })
+        c.drawRoundRect(RectF(480f, 400f, 660f, 520f), 18f, 18f, Paint(aa).apply { color = Color.rgb(40, 42, 48) }) // battery/motor
+        c.drawLine(740f, 230f, 830f, 215f, Paint(aa).apply { strokeWidth = 14f; color = Color.rgb(20, 20, 22); strokeCap = Paint.Cap.ROUND }) // bars
+        c.drawPath(Path().apply { moveTo(780f, 300f); lineTo(880f, 380f); lineTo(860f, 300f); close() }, body) // fender
         val f = File(ctx.filesDir, "photos").apply { mkdirs() }.resolve("gallery.jpg"); f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 90, it) }
         return f.absolutePath
     }
@@ -71,7 +86,7 @@ class GalleryTest {
             g.saveVehicle(VehicleProfile("gal", "Kinetic MX 01", VehicleType.E_MOTOCROSS, "Eigenbau", "MX-75", drawnPhoto(), "QS 138 90H", 70.0, 7, 7000.0,
                 8.0, 0.48, 98.0, 30.0, 72.0, 20, "NMC", 15000.0, 300.0, 200.0, 2))
             g.selectVehicle("gal")
-            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0) }
+            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0, orientation = org.kineticos.app.data.ScreenOrientation.AUTO) }
         }
         // 1) ride with the simulated vehicle (incl. emulated vehicle script) so rides/telemetry have data
         g.connectTo("sim-script")
@@ -124,6 +139,14 @@ class GalleryTest {
         (g.connection.transport as org.kineticos.vesc.sim.SimulatedVescTransport).externalErpm = 2000.0
         waitFor { g.connection.scriptStatus.value?.lock?.tamper == true }
         open("DASH", 2500); shot("16_diebstahlsperre_alarm")
-        g.disconnect()
+        g.disconnect(); pump(1000)
+        // personalisation: own background image, own name next to the logo
+        runBlocking { g.settingsRepo.update { it.copy(bgImage = drawnPhoto(), bgDim = 0.72f, brandName = "MX TEAM") } }
+        open("HOME", 3000); shot("17_eigenes_design")
+        open("SETTINGS", 2000); shot("18_design_einstellungen")
     }
 }
+
+/** Same gallery in landscape (handlebar mount). */
+@Config(sdk = [34], qualifiers = "de-w891dp-h411dp-land-xxhdpi")
+class GalleryLandscapeTest : GalleryTest() { override val prefix = "quer_" }
