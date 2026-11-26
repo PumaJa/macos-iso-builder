@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
@@ -74,6 +76,27 @@ fun SettingsScreen() {
                 BigButton(stringResource(R.string.set_remove), Modifier.weight(0.6f), enabled = s.logoImage != null, compact = true) { ImageStore.delete(s.logoImage); upd { it.copy(logoImage = null) } }
             }
             Field(stringResource(R.string.set_brand_name), brandName, { brandName = it.take(24); upd { st -> st.copy(brandName = brandName) } }, Modifier.fillMaxWidth())
+        }
+        Text(stringResource(R.string.set_logo_style), color = p.textDim, style = labelStyle(11), modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LogoStyle.entries.forEach { st -> Box(Modifier.weight(1f).height(72.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .background(if (s.logoStyle == st && s.logoImage == null) K.Accent else p.surface)
+                .clickable { upd { it.copy(logoStyle = st) } }, contentAlignment = androidx.compose.ui.Alignment.Center) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(logoRes(st)), st.name, Modifier.size(40.dp),
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (s.logoStyle == st && s.logoImage == null) K.OnAccent else p.text))
+            } }
+        }
+        Text(stringResource(R.string.set_design_preset), color = p.textDim, style = labelStyle(11), modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DesignPreset.entries.forEach { pr -> val pal = nightPalette(pr)
+                Column(Modifier.weight(1f).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(pal.bg)
+                    .border(if (s.designPreset == pr) 2.dp else 1.dp, if (s.designPreset == pr) K.Accent else p.grid, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .clickable { upd { it.copy(designPreset = pr) } }.padding(10.dp)) {
+                    Box(Modifier.fillMaxWidth().height(22.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(pal.surface2))
+                    Text(stringResource(when (pr) { DesignPreset.OLED -> R.string.preset_oled; DesignPreset.GRAPHITE -> R.string.preset_graphite; DesignPreset.TITANIUM -> R.string.preset_titanium }),
+                        style = labelStyle(11), color = pal.text, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
         }
         LabeledSlider(stringResource(R.string.set_accent), s.accentLevel, { v -> upd { it.copy(accentLevel = v) } }, 0.4f..1f)
         LabeledSlider(stringResource(R.string.set_text_scale), s.textScale, { v -> upd { it.copy(textScale = v) } }, 0.85f..1.3f)

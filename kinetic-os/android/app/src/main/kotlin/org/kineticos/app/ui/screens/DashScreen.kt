@@ -158,7 +158,10 @@ fun DashScreen(go: (Screen) -> Unit) {
         if (landscape) Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             // left: mode · riding time · power (large, readable at a glance)
             Column(Modifier.weight(0.75f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceEvenly) {
-                BigStat(stringResource(R.string.home_mode), (applied?.name ?: stringResource(R.string.mode_stock)).uppercase(), if (applied == null) p.textDim else p.text)
+                // Stark-style: the mode slot number large, its name as the label
+                val slot = profiles.take(5).indexOfFirst { it.id == applied?.id }
+                BigStat(stringResource(R.string.home_mode) + " · " + (applied?.name ?: stringResource(R.string.mode_stock)).uppercase(),
+                    if (slot >= 0) "M${slot + 1}" else (applied?.name ?: stringResource(R.string.mode_stock)).uppercase(), if (applied == null) p.textDim else p.text)
                 val ms = engine?.movingTimeMs ?: 0L
                 BigStat(stringResource(R.string.home_riding_time), "%d:%02d".format(ms / 3_600_000, ms / 60_000 % 60), p.text)
                 BigStat("$pUnit · " + stringResource(if (pw < 0) R.string.dash_regen else R.string.dash_power), fmt(power, 1, pScale), qColor(power.quality, p.text))

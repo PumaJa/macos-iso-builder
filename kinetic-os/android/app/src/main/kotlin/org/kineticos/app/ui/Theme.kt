@@ -35,9 +35,15 @@ val NightPalette = Palette(Color(0xFF000000), Color(0xFF121212), Color(0xFF1E1E2
 val SunPalette = Palette(Color.White, Color.White, Color(0xFFEDEDED), Color.Black, Color(0xFF202020), Color(0xFF9A9A9A), night = false, sun = true)
 val DayPalette = Palette(Color(0xFFF2F2F4), Color(0xFFFFFFFF), Color(0xFFE8E8EC), Color(0xFF0A0A0A), Color(0xFF5E5E66), Color(0xFFD4D4DA), false)
 val LocalPalette = staticCompositionLocalOf { NightPalette }
+/** Dark design presets: OLED (true black), Graphite (soft dark grey), Titanium (warm grey). */
+fun nightPalette(preset: org.kineticos.app.data.DesignPreset) = when (preset) {
+    org.kineticos.app.data.DesignPreset.OLED -> NightPalette
+    org.kineticos.app.data.DesignPreset.GRAPHITE -> Palette(Color(0xFF111113), Color(0xFF1A1A1D), Color(0xFF242428), Color(0xFFF5F5F7), Color(0xFF9A9AA0), Color(0xFF34343A), true)
+    org.kineticos.app.data.DesignPreset.TITANIUM -> Palette(Color(0xFF0E0D0C), Color(0xFF181614), Color(0xFF221F1C), Color(0xFFF4F1EC), Color(0xFF9E978E), Color(0xFF35302A), true)
+}
 val LocalGlove = staticCompositionLocalOf { true }
 /** User branding: own logo image (file path) and name shown next to it. */
-data class Brand(val logo: String? = null, val name: String = "KINETIC")
+data class Brand(val logo: String? = null, val name: String = "KINETIC", val style: org.kineticos.app.data.LogoStyle = org.kineticos.app.data.LogoStyle.APEX)
 val LocalBrand = staticCompositionLocalOf { Brand() }
 
 val Mono = FontFamily.Monospace
@@ -56,9 +62,10 @@ fun labelStyle(size: Int = 12) = TextStyle(fontFamily = Display, fontWeight = Fo
 fun titleStyle(size: Int = 28) = TextStyle(fontFamily = Display, fontWeight = if (size >= 30) FontWeight.Light else FontWeight.Normal, fontSize = size.sp, letterSpacing = 0.3.sp)
 
 @Composable
-fun KineticTheme(mode: ThemeMode, glove: Boolean, accentLevel: Float = 0.95f, brand: Brand = Brand(), content: @Composable () -> Unit) {
+fun KineticTheme(mode: ThemeMode, glove: Boolean, accentLevel: Float = 0.95f, brand: Brand = Brand(),
+                 preset: org.kineticos.app.data.DesignPreset = org.kineticos.app.data.DesignPreset.OLED, content: @Composable () -> Unit) {
     val night = when (mode) { ThemeMode.NIGHT -> true; ThemeMode.DAY, ThemeMode.SUN -> false; ThemeMode.AUTO -> isSystemInDarkTheme() || isNightHour() }
-    val p = if (mode == ThemeMode.SUN) SunPalette else if (night) NightPalette else DayPalette
+    val p = if (mode == ThemeMode.SUN) SunPalette else if (night) nightPalette(preset) else DayPalette
     val scheme = if (night) darkColorScheme(primary = Color(0xFFF2F2F2), onPrimary = Color.Black, background = p.bg, surface = p.surface, surfaceVariant = p.surface2,
         onSurface = p.text, onSurfaceVariant = p.textDim, onBackground = p.text, secondary = K.AccentDim, outline = p.grid, surfaceContainer = p.surface)
     else lightColorScheme(primary = Color(0xFF111111), onPrimary = Color.White, background = p.bg, surface = p.surface, surfaceVariant = p.surface2,

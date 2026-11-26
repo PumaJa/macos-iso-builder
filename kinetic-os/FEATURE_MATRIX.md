@@ -151,6 +151,8 @@ erforderlich · **NS** = Nicht unterstützt.
 | Sperrbildschirm: animierter Sicherheitsring, Alarmbalken bei Bewegung, PIN-Feld direkt auf dem Bildschirm | IT (Render, Simulator-E2E) |
 | Traktionskontrolle pro Modus 0–100 % (im Fahrzeugskript, nur Strom-Reduktion, in der Luft aus, „TC“-Anzeige im Cockpit) | IT (Simulator-E2E, LispBM-Interpreter 337 Tests) / experimentell, nicht auf Hardware validiert |
 | Fahrmodi M1–M5 direkt einstellen (große Werte + Regler für Leistung in PS, Rekuperation, Traktion), Standardmodi anpassbar mit „Werkszustand“ | IT (Render) |
+| Neues Logo „Apex“ (eigene Marke) + wählbare Varianten Ring/Kachel/klassisch; Design-Presets OLED/Graphit/Titan; Cockpit zeigt Modus als „M1“ | IT (Render) |
+| Design-Brief für weitere Entwürfe (OpenClaw / lokales Modell): docs/DESIGN_BRIEF.md | Doku |
 | Versionsverlauf App · VESC-Firmware/Hardware (Einstellungen → Info) | IT |
 | Mindestleistung für Fahrmodi (5 %) | IT |
 | Ladeanzeige (Leistung, voll in …), nur wenn der VESC/BMS den Ladestrom misst | IH |

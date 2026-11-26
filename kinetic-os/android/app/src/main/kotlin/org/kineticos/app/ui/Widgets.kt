@@ -144,12 +144,19 @@ fun KineticLogo(modifier: Modifier = Modifier, size: Int = 22) {
     val p = LocalPalette.current; val brand = LocalBrand.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (brand.logo != null) LogoImage(brand.logo, Modifier.height((size * 1.6f).dp).widthIn(max = (size * 6).dp))
-        else Image(androidx.compose.ui.res.painterResource(R.drawable.ic_kinetic_mark), null, Modifier.size((size * 1.25f).dp), colorFilter = ColorFilter.tint(p.text))
+        else Image(androidx.compose.ui.res.painterResource(logoRes(brand.style)), null, Modifier.size((size * 1.35f).dp), colorFilter = ColorFilter.tint(p.text))
         if (brand.name.isNotBlank()) {
             Spacer(Modifier.width(8.dp))
             Text(brand.name.uppercase(), style = titleStyle(size).copy(letterSpacing = (size / 6f).sp), color = p.text, maxLines = 1)
         }
     }
+}
+
+fun logoRes(style: org.kineticos.app.data.LogoStyle) = when (style) {
+    org.kineticos.app.data.LogoStyle.APEX -> R.drawable.ic_logo_apex
+    org.kineticos.app.data.LogoStyle.RING -> R.drawable.ic_logo_ring
+    org.kineticos.app.data.LogoStyle.TILE -> R.drawable.ic_logo_tile
+    org.kineticos.app.data.LogoStyle.SPEED -> R.drawable.ic_kinetic_mark
 }
 
 @Composable

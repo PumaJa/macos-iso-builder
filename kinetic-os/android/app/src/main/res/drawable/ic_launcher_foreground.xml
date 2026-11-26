@@ -1,8 +1,6 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Kinetic OS mark (original): forward-slanted "K" made of three speed bars -->
+    <!-- Kinetic OS mark "Apex" (original) centred in the adaptive-icon safe zone -->
     <group android:translateX="30" android:translateY="30">
-        <path android:fillColor="#FFFFFF" android:pathData="M14,6h9l-8,36h-9z"/>
-        <path android:fillColor="#FFFFFF" android:pathData="M24,22l15,-16h9l-17,19z"/>
-        <path android:fillColor="#FFFFFF" android:pathData="M27,27h8l7,15h-9z"/>
+        <path android:fillColor="#FFFFFF" android:pathData="M10.5,8h5v32h-5z M19.5,24L32,8H38L25.5,24L38,40H32Z"/>
     </group>
 </vector>

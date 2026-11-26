@@ -616,4 +616,9 @@
     <string name="modes_save_apply">Salva e guida</string>
     <string name="modes_reset_factory">Fabbrica</string>
     <string name="modes_advanced">Altro</string>
+    <string name="set_logo_style">Logo</string>
+    <string name="set_design_preset">Design</string>
+    <string name="preset_oled">OLED</string>
+    <string name="preset_graphite">Grafite</string>
+    <string name="preset_titanium">Titanio</string>
 </resources>

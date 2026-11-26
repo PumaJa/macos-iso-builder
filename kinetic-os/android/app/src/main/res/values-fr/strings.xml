@@ -616,4 +616,9 @@
     <string name="modes_save_apply">Enregistrer &amp; rouler</string>
     <string name="modes_reset_factory">Usine</string>
     <string name="modes_advanced">Plus</string>
+    <string name="set_logo_style">Logo</string>
+    <string name="set_design_preset">Design</string>
+    <string name="preset_oled">OLED</string>
+    <string name="preset_graphite">Graphite</string>
+    <string name="preset_titanium">Titane</string>
 </resources>

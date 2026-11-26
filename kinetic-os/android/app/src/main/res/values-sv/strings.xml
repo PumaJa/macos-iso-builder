@@ -616,4 +616,9 @@
     <string name="modes_save_apply">Spara &amp; kör</string>
     <string name="modes_reset_factory">Fabrik</string>
     <string name="modes_advanced">Mer</string>
+    <string name="set_logo_style">Logotyp</string>
+    <string name="set_design_preset">Design</string>
+    <string name="preset_oled">OLED</string>
+    <string name="preset_graphite">Grafit</string>
+    <string name="preset_titanium">Titan</string>
 </resources>

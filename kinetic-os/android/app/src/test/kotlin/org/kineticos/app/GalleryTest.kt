@@ -86,7 +86,7 @@ open class GalleryTest {
             g.saveVehicle(VehicleProfile("gal", "Kinetic MX 01", VehicleType.E_MOTOCROSS, "Eigenbau", "MX-75", drawnPhoto(), "QS 138 90H", 70.0, 7, 7000.0,
                 8.0, 0.48, 98.0, 30.0, 72.0, 20, "NMC", 15000.0, 300.0, 200.0, 2))
             g.selectVehicle("gal")
-            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0, orientation = org.kineticos.app.data.ScreenOrientation.AUTO, bgImage = null, logoImage = null, brandName = "KINETIC", tileImages = emptyMap()) }
+            g.settingsRepo.update { it.copy(theme = ThemeMode.NIGHT, dimAfterIdleS = 0, orientation = org.kineticos.app.data.ScreenOrientation.AUTO, bgImage = null, logoImage = null, brandName = "KINETIC", tileImages = emptyMap(), designPreset = org.kineticos.app.data.DesignPreset.OLED, logoStyle = org.kineticos.app.data.LogoStyle.APEX) }
         }
         // 1) ride with the simulated vehicle (incl. emulated vehicle script) so rides/telemetry have data
         g.connectTo("sim-script")
@@ -154,6 +154,12 @@ open class GalleryTest {
         runBlocking { g.settingsRepo.update { drawnPhoto().let { ph -> it.copy(bgImage = ph, bgDim = 0.72f, brandName = "MX TEAM", tileImages = mapOf("STATS" to ph, "TRAILS" to ph)) } } }
         open("HOME", 3000); shot("17_eigenes_design")
         open("SETTINGS", 2000); shot("18_design_einstellungen")
+        compose.onNodeWithText("OLED").performScrollTo(); pump(800); compose.waitForIdle(); shot("18b_logo_und_design")
+        runBlocking { g.settingsRepo.update { it.copy(bgImage = null, designPreset = org.kineticos.app.data.DesignPreset.GRAPHITE, logoStyle = org.kineticos.app.data.LogoStyle.RING, brandName = "KINETIC") } }
+        open("HOME", 2500); shot("20_design_graphit")
+        runBlocking { g.settingsRepo.update { it.copy(designPreset = org.kineticos.app.data.DesignPreset.TITANIUM, logoStyle = org.kineticos.app.data.LogoStyle.TILE) } }
+        open("HOME", 2500); shot("21_design_titan")
+        runBlocking { g.settingsRepo.update { it.copy(designPreset = org.kineticos.app.data.DesignPreset.OLED, logoStyle = org.kineticos.app.data.LogoStyle.APEX, tileImages = emptyMap()) } }
     }
 }
 

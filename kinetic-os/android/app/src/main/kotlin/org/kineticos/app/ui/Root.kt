@@ -98,9 +98,9 @@ fun KineticRoot(activity: MainActivity) {
             org.kineticos.app.data.ScreenOrientation.AUTO -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
-    val brand = Brand(settings.logoImage, settings.brandName)
-    if (pip) { KineticTheme(settings.theme, false, settings.accentLevel, brand) { PipDash() }; return }
-    KineticTheme(settings.theme, settings.gloveMode, settings.accentLevel, brand) {
+    val brand = Brand(settings.logoImage, settings.brandName, settings.logoStyle)
+    if (pip) { KineticTheme(settings.theme, false, settings.accentLevel, brand, settings.designPreset) { PipDash() }; return }
+    KineticTheme(settings.theme, settings.gloveMode, settings.accentLevel, brand, settings.designPreset) {
         val p = LocalPalette.current
         val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
         val status by g.connection.status.collectAsStateWithLifecycle()

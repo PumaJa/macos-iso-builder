@@ -15,6 +15,10 @@ val DEFAULT_TILES = listOf("VOLT", "BATT_A", "MOTOR_A", "FET", "MOTOR_T", "TRIP"
 enum class SpeedUnit { KMH, MPH }
 enum class PowerUnit { KW, PS, HP }
 enum class ScreenOrientation { AUTO, LANDSCAPE, PORTRAIT }
+/** Built-in logo marks (a custom logo image overrides them). */
+enum class LogoStyle { APEX, RING, TILE, SPEED }
+/** Dark design presets (all greyscale). */
+enum class DesignPreset { OLED, GRAPHITE, TITANIUM }
 
 data class AppSettings(
     val activeVehicleId: String? = null,
@@ -65,6 +69,8 @@ data class AppSettings(
     val tileImages: Map<String, String> = emptyMap(),
     /** Text size multiplier for the whole app (0.85 … 1.3). */
     val textScale: Float = 1f,
+    val logoStyle: LogoStyle = LogoStyle.APEX,
+    val designPreset: DesignPreset = DesignPreset.OLED,
 )
 val DEFAULT_HOME_TILES = listOf("STATS", "MODES", "TRAILS", "TRACKS", "RIDES", "GROUP", "GARAGE", "SETTINGS")
 
@@ -83,6 +89,7 @@ class SettingsRepo(private val ctx: Context) {
         val orient = stringPreferencesKey("orient"); val bg = stringPreferencesKey("bgImage"); val bgDim = floatPreferencesKey("bgDim")
         val logo = stringPreferencesKey("logoImage"); val brand = stringPreferencesKey("brand"); val accent = floatPreferencesKey("accentLevel")
         val homeTiles = stringPreferencesKey("homeTiles"); val tileImgs = stringPreferencesKey("tileImages"); val textScale = floatPreferencesKey("textScale")
+        val logoStyle = stringPreferencesKey("logoStyle"); val preset = stringPreferencesKey("designPreset")
     }
     val flow: Flow<AppSettings> = ctx.store.data.map { p ->
         val d = AppSettings()
@@ -104,6 +111,8 @@ class SettingsRepo(private val ctx: Context) {
             p[K.homeTiles]?.split(',')?.filter { it.isNotBlank() } ?: d.homeTiles,
             p[K.tileImgs]?.split('|')?.mapNotNull { e -> e.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap() ?: d.tileImages,
             p[K.textScale] ?: d.textScale,
+            p[K.logoStyle]?.let { runCatching { LogoStyle.valueOf(it) }.getOrNull() } ?: d.logoStyle,
+            p[K.preset]?.let { runCatching { DesignPreset.valueOf(it) }.getOrNull() } ?: d.designPreset,
         )
     }
     suspend fun current() = flow.first()
@@ -122,6 +131,7 @@ class SettingsRepo(private val ctx: Context) {
             put(K.brand, n.brandName.take(24)); put(K.accent, n.accentLevel.coerceIn(0.4f, 1f))
             put(K.homeTiles, n.homeTiles.joinToString(",")); put(K.tileImgs, n.tileImages.entries.joinToString("|") { "${it.key}=${it.value}" })
             put(K.textScale, n.textScale.coerceIn(0.85f, 1.3f))
+            put(K.logoStyle, n.logoStyle.name); put(K.preset, n.designPreset.name)
         }
     }
 }

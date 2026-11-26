@@ -1,0 +1,4 @@
+<!-- Kinetic OS mark "Apex" (original): upright stem + free-standing chevron = motion and precision. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FFFFFF" android:pathData="M10.5,8h5v32h-5z M19.5,24L32,8H38L25.5,24L38,40H32Z"/>
+</vector>

@@ -616,4 +616,9 @@
     <string name="modes_save_apply">Speichern &amp; fahren</string>
     <string name="modes_reset_factory">Werkszustand</string>
     <string name="modes_advanced">Mehr</string>
+    <string name="set_logo_style">Logo</string>
+    <string name="set_design_preset">Design</string>
+    <string name="preset_oled">OLED</string>
+    <string name="preset_graphite">Graphit</string>
+    <string name="preset_titanium">Titan</string>
 </resources>

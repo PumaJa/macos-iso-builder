@@ -31,3 +31,4 @@
 | 2026-11-25 | Final polish: cached photo loading (hero always shows), localised race accuracy note, gallery state reset | all green |
 | 2026-11-25 | Stark 2026 parity for VESC: traction control (LispBM via subagent, cmd 9, 24-byte status) + app slider/pill/gate/simulator, version history, min power, charging card | see TEST_RESULTS |
 | 2026-11-26 | Stark-style mode slots (M1–M5 values + sliders, built-in overrides with factory reset), charging card in simulator, gallery: editor, charging, version history | all green |
+| 2026-11-26 | New "Apex" logo + Ring/Tile variants, design presets OLED/Graphite/Titanium, M-slot on cockpit, DESIGN_BRIEF.md for OpenClaw/local model | all green |
