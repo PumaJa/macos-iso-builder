@@ -73,7 +73,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
     // Charging through the controller / VESC BMS: measured negative battery current at standstill. Chargers that bypass
     // the controller are invisible to the VESC – then nothing is shown (never guessed).
     val charging = s?.let { smp -> val i = smp.batteryCurrentA; val v = smp.speedMps.value ?: 0.0
-        i.isAvailable && i.quality != org.kineticos.telemetry.Quality.SIMULATED && i.value!! < -0.5 && v < 0.3 } == true
+        i.isAvailable && i.value!! < -0.5 && v < 0.3 } == true
     val numbers: @Composable () -> Unit = {
         if (charging) {
             val pw = -(s?.batteryPowerW?.value ?: 0.0)
@@ -84,7 +84,10 @@ fun HomeScreen(go: (Screen) -> Unit) {
                 Icon(Icons.Filled.BatteryChargingFull, null, tint = p.text, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.home_charging), style = titleStyle(20), color = p.text)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.home_charging), style = titleStyle(20), color = p.text)
+                        if (s?.simulated == true) Pill("SIM", K.Sim, Modifier.padding(start = 8.dp))
+                    }
                     Text("%.1f kW".format(pw / 1000) + (eta?.let { " · " + stringResource(R.string.home_charging_eta, it.toInt(), (it * 60 % 60).toInt()) } ?: ""), style = labelStyle(10), color = p.textDim)
                 }
             }

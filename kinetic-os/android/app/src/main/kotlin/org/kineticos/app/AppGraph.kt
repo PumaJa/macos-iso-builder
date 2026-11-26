@@ -56,7 +56,12 @@ class AppGraph(val ctx: Context) {
     val activeVehicle: StateFlow<VehicleProfile?> = combine(vehicles, settings) { v, s -> v.firstOrNull { it.id == s.activeVehicleId } ?: v.firstOrNull() }
         .stateIn(scope, SharingStarted.Eagerly, null)
     val profiles: StateFlow<List<RideProfile>> = db.profiles().all()
-        .map { l -> RideProfile.BUILT_IN + l.mapNotNull { runCatching { AppJson.decodeFromString<RideProfile>(it.json) }.getOrNull() } }
+        .map { l ->
+            val stored = l.mapNotNull { runCatching { AppJson.decodeFromString<RideProfile>(it.json) }.getOrNull() }
+            val builtInIds = RideProfile.BUILT_IN.map { it.id }.toSet()
+            // a stored profile with a built-in id is the user's adjustment of that mode (keeps its M-slot position)
+            RideProfile.BUILT_IN.map { b -> stored.firstOrNull { it.id == b.id }?.copy(builtIn = true) ?: b } + stored.filter { it.id !in builtInIds }
+        }
         .stateIn(scope, SharingStarted.Eagerly, RideProfile.BUILT_IN)
     private val _appliedProfile = MutableStateFlow<RideProfile?>(null); val appliedProfile: StateFlow<RideProfile?> = _appliedProfile
     private val _toast = MutableSharedFlow<String>(extraBufferCapacity = 16); val toasts: SharedFlow<String> = _toast
@@ -155,7 +160,8 @@ class AppGraph(val ctx: Context) {
 
     // ---------- ride profiles ----------
     suspend fun saveProfile(p: RideProfile): String? {
-        if (p.builtIn) return "Built-in modes cannot be edited – duplicate it instead"
+        // built-in modes may be adjusted (stored as an override under the same id); "reset" deletes the override
+        if (p.builtIn && RideProfile.BUILT_IN.none { it.id == p.id }) return "Unknown built-in mode"
         if (db.profiles().count() >= RideProfile.MAX_PROFILES) return "Maximum of ${RideProfile.MAX_PROFILES} custom profiles reached"
         db.profiles().upsert(RideProfileEntity(p.id, activeVehicle.value?.id, AppJson.encodeToString(p), 100))
         return null

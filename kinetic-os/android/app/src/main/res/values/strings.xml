@@ -608,4 +608,12 @@
     <string name="set_version_history">Version history (app · vehicle)</string>
     <string name="home_charging">Charging</string>
     <string name="home_charging_eta">full in %1$d:%2$02d h</string>
+    <string name="modes_active">ACTIVE</string>
+    <string name="modes_slot_power">Power</string>
+    <string name="modes_slot_regen">Regen</string>
+    <string name="modes_slot_tc">Traction</string>
+    <string name="modes_tc_off">OFF</string>
+    <string name="modes_save_apply">Save &amp; ride</string>
+    <string name="modes_reset_factory">Factory</string>
+    <string name="modes_advanced">More</string>
 </resources>

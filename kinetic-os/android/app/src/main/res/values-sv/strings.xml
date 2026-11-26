@@ -608,4 +608,12 @@
     <string name="set_version_history">Versionshistorik (app · fordon)</string>
     <string name="home_charging">Laddar</string>
     <string name="home_charging_eta">full om %1$d:%2$02d h</string>
+    <string name="modes_active">AKTIV</string>
+    <string name="modes_slot_power">Effekt</string>
+    <string name="modes_slot_regen">Regenerering</string>
+    <string name="modes_slot_tc">Traktion</string>
+    <string name="modes_tc_off">AV</string>
+    <string name="modes_save_apply">Spara &amp; kör</string>
+    <string name="modes_reset_factory">Fabrik</string>
+    <string name="modes_advanced">Mer</string>
 </resources>

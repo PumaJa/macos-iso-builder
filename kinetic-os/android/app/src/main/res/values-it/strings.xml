@@ -608,4 +608,12 @@
     <string name="set_version_history">Cronologia versioni (app · veicolo)</string>
     <string name="home_charging">In carica</string>
     <string name="home_charging_eta">carico tra %1$d:%2$02d h</string>
+    <string name="modes_active">ATTIVO</string>
+    <string name="modes_slot_power">Potenza</string>
+    <string name="modes_slot_regen">Recupero</string>
+    <string name="modes_slot_tc">Trazione</string>
+    <string name="modes_tc_off">OFF</string>
+    <string name="modes_save_apply">Salva e guida</string>
+    <string name="modes_reset_factory">Fabbrica</string>
+    <string name="modes_advanced">Altro</string>
 </resources>

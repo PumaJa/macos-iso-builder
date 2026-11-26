@@ -64,6 +64,8 @@ class SimulatedVescTransport(
     /** Test hook: vehicle is airborne – TC does not intervene. */
     var airborne = false
     val tcActive get() = tcScale < 0.999
+    /** Test hook: charging current in A flowing into the battery through the controller (0 = not charging). */
+    var chargingA = 0.0
     /** Test hook: someone pushes the parked vehicle (wheel turns while locked). */
     var externalErpm = 0.0
     private fun scriptReply(ver: Int, cmd: Int, res: Int): ByteArray {
@@ -138,7 +140,7 @@ class SimulatedVescTransport(
     }
     private fun voltage() = 84.0 - ah * 0.4
     private fun motorCurrent() = (throttle * 120 * maxScale * tcScale - erpm / 2000).coerceIn(-40.0, 150.0)
-    private fun inputCurrent() = (motorCurrent() * (erpm / maxErpm).coerceIn(0.0, 1.0)).coerceAtMost(wattMax / voltage())
+    private fun inputCurrent() = if (chargingA > 0) -chargingA else (motorCurrent() * (erpm / maxErpm).coerceIn(0.0, 1.0)).coerceAtMost(wattMax / voltage())
 
     override suspend fun write(bytes: ByteArray) {
         for (req in decoder.feed(bytes)) handle(req)

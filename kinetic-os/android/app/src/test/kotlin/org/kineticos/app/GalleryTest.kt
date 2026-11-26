@@ -97,12 +97,13 @@ open class GalleryTest {
         repeat(4) { k -> fun feed(gv: Double, ms: Long) { val e = tj + ms; while (tj < e) { g.motion.inject(tj, gv); tj += 10 } }
             feed(1.0, 400); feed(0.12, 500L + k * 250); feed(2.2 + k * 0.4, 60); feed(1.0, 400); pump(700) }
         pump(3000)
-        runBlocking { g.applyProfile(RideProfile.ECO.copy(tractionControl = 0.3)) }
+        runBlocking { g.deleteProfile("eco"); g.saveProfile(RideProfile.ECO.copy(tractionControl = 0.3)); g.applyProfile(RideProfile.ECO.copy(tractionControl = 0.3)) }
         pump(6000)
         open("HOME", 7000); shot("00_start")
         open("DASH"); shot("01_cockpit")
         open("LIVE"); shot("02_telemetrie")
         open("MODES"); shot("03_fahrmodi")
+        compose.onAllNodesWithText("MEHR")[0].performScrollTo().performClick(); pump(1200); compose.waitForIdle(); shot("03b_modus_editor")
         open("SETUP"); shot("04_vesc_setup_check")
         open("GARAGE"); shot("05_garage")
         open("CONNECT"); shot("06_verbinden")
@@ -110,6 +111,7 @@ open class GalleryTest {
         open("REMOTE"); shot("08_fernueberwachung")
         open("GROUP"); shot("09_gruppenfahrt")
         open("SETTINGS"); shot("10_einstellungen")
+        compose.onNodeWithText("Versionsverlauf", substring = true).performScrollTo(); compose.onRoot().performTouchInput { swipeUp() }; pump(800); compose.waitForIdle(); shot("10b_versionsverlauf")
         // finish the ride → ride list + detail with charts
         g.disconnect(); pump(3000)
         open("RIDES"); shot("11_fahrten")
@@ -139,6 +141,14 @@ open class GalleryTest {
         (g.connection.transport as org.kineticos.vesc.sim.SimulatedVescTransport).externalErpm = 2000.0
         waitFor { g.connection.scriptStatus.value?.lock?.tamper == true }
         open("DASH", 2500); shot("16_diebstahlsperre_alarm")
+        // charging through the controller (simulated, labelled SIM)
+        val simL = g.connection.transport as org.kineticos.vesc.sim.SimulatedVescTransport
+        simL.externalErpm = 0.0; pump(1500)
+        check(runBlocking { g.lockAction("unlock", "2468") } == "Vehicle unlocked")
+        simL.chargingA = 14.0
+        waitFor { (g.connection.sample.value?.batteryCurrentA?.value ?: 0.0) < -0.5 && (g.connection.sample.value?.speedMps?.value ?: 1.0) < 0.3 }
+        open("HOME", 2500); shot("19_laden")
+        simL.chargingA = 0.0
         g.disconnect(); pump(1000)
         // personalisation: own background image, own name next to the logo
         runBlocking { g.settingsRepo.update { drawnPhoto().let { ph -> it.copy(bgImage = ph, bgDim = 0.72f, brandName = "MX TEAM", tileImages = mapOf("STATS" to ph, "TRAILS" to ph)) } } }

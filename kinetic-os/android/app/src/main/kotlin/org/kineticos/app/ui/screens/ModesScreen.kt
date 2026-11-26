@@ -40,12 +40,17 @@ fun ModesScreen() {
     LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.modes_title))
-            // M1…M5 quick slots (first five modes) – one tap applies through the SafetyGate
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                profiles.take(5).forEachIndexed { i, pr ->
-                    BigButton("M${i + 1}", Modifier.weight(1f), selected = applied?.id == pr.id, compact = true) { scope.launch { result = g.applyProfile(pr) } }
-                }
+            // M1…M5 slots (first five modes): pick one, adjust power / regen / traction directly, save & ride
+            val slots = profiles.take(5)
+            var sel by remember { mutableIntStateOf(slots.indexOfFirst { it.id == applied?.id }.coerceAtLeast(0)) }
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                slots.forEachIndexed { i, pr -> BigButton("M${i + 1}", Modifier.weight(1f), selected = sel == i, compact = true) { sel = i } }
             }
+            slots.getOrNull(sel)?.let { base -> ModeSlotPanel(sel, base, applied?.id == base.id, backup?.conf?.wattMax,
+                onSaveApply = { d -> scope.launch { if (d != base) g.saveProfile(d)?.let { g.toast(it) }; result = g.applyProfile(d) } },
+                onReset = { scope.launch { g.deleteProfile(base.id) } },
+                onAdvanced = { editing = base }) }
+            Spacer(Modifier.height(10.dp))
             Card(Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.modes_fw, caps.firmware?.versionString ?: "—", stringResource(if (caps.firmwareSupportedForWrites) R.string.modes_supported else R.string.modes_blocked)), color = p.text)
                 Text(stringResource(R.string.modes_backup, backup?.let { stringResource(R.string.modes_taken, java.text.SimpleDateFormat("dd.MM.yy HH:mm").format(java.util.Date(it.takenAtMs))) } ?: stringResource(R.string.modes_backup_none)), color = p.textDim)
@@ -76,6 +81,58 @@ fun ModesScreen() {
                     if (!pr.builtIn) BigButton(stringResource(R.string.modes_delete), Modifier.weight(0.8f), color = K.Danger) { scope.launch { g.deleteProfile(pr.id) } }
                 }
             }
+        }
+    }
+}
+
+/** Stark-style mode panel: big values + sliders for power, regen and traction control of one M-slot. */
+@Composable
+private fun ModeSlotPanel(index: Int, base: RideProfile, active: Boolean, wattMax: Double?, onSaveApply: (RideProfile) -> Unit, onReset: () -> Unit, onAdvanced: () -> Unit) {
+    val p = LocalPalette.current
+    var d by remember(base) { mutableStateOf(base) }
+    val factory = RideProfile.BUILT_IN.firstOrNull { it.id == base.id }
+    Card(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("M${index + 1}", style = labelStyle(11), color = p.textDim)
+                Text(d.name, style = titleStyle(36), color = p.text)
+            }
+            if (active) Pill(stringResource(R.string.modes_active), p.text)
+        }
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
+        val values: @Composable (Modifier) -> Unit = { m -> Row(m.padding(vertical = 14.dp)) {
+            val pw = wattMax?.let { w -> "%.0f".format(w * d.powerFraction / 735.49875) to "PS" } ?: "%.0f".format(d.powerFraction * 100) to "%"
+            BigValue(stringResource(R.string.modes_slot_power), pw.first, pw.second, Modifier.weight(1f))
+            BigValue(stringResource(R.string.modes_slot_regen), "%.0f".format(d.regenFraction * 100), "%", Modifier.weight(1f))
+            BigValue(stringResource(R.string.modes_slot_tc), if (d.tractionControl > 0) "%.0f".format(d.tractionControl * 100) else stringResource(R.string.modes_tc_off),
+                if (d.tractionControl > 0) "%" else "", Modifier.weight(1f))
+        } }
+        val sliders: @Composable ColumnScope.() -> Unit = {
+        LabeledSlider(stringResource(R.string.modes_slot_power), d.powerFraction.toFloat(), { d = d.copy(powerFraction = it.toDouble().coerceAtLeast(RideProfile.MIN_POWER_FRACTION)) },
+            RideProfile.MIN_POWER_FRACTION.toFloat()..1f, { f -> wattMax?.let { "%.0f PS · %.1f kW".format(it * f / 735.49875, it * f / 1000) } ?: "%.0f%%".format(f * 100) })
+        LabeledSlider(stringResource(R.string.modes_slot_regen), d.regenFraction.toFloat(), { d = d.copy(regenFraction = it.toDouble()) })
+        LabeledSlider(stringResource(R.string.modes_slot_tc), d.tractionControl.toFloat(), { d = d.copy(tractionControl = Math.round(it * 20) / 20.0) }, 0f..1f,
+            { if (it < 0.025f) "—" else "%.0f%%".format(it * 100) })
+        }
+        if (landscape) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            values(Modifier.weight(1f)); Spacer(Modifier.width(24.dp)); Column(Modifier.weight(1f), content = sliders)
+        } else { values(Modifier.fillMaxWidth()); sliders() }
+        BigButton(stringResource(R.string.modes_save_apply), Modifier.fillMaxWidth().padding(top = 8.dp), selected = true) { onSaveApply(d) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            if (factory != null && factory != base) BigButton(stringResource(R.string.modes_reset_factory), Modifier.weight(1f), compact = true) { onReset() }
+            BigButton(stringResource(R.string.modes_advanced), Modifier.weight(1f), compact = true) { onAdvanced() }
+        }
+    }
+}
+
+@Composable
+private fun BigValue(label: String, value: String, unit: String, modifier: Modifier) {
+    val p = LocalPalette.current
+    Column(modifier) {
+        Text(label.uppercase(), style = labelStyle(10), color = p.textDim)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+            Text(value, style = numStyle(44), color = p.text)
+            if (unit.isNotEmpty()) Text(" $unit", style = labelStyle(12), color = p.textDim, modifier = Modifier.padding(bottom = 8.dp))
         }
     }
 }
